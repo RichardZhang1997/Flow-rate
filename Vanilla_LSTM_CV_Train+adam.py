@@ -6,7 +6,7 @@ Created on Wed Sep  9 10:21:14 2020
 """
 
 import os
-os.chdir("C:\\MyFile\\Study\\Graduate\\Marko MIne\\Flowrate")
+os.chdir("C:\\MyFile\\Study\\Graduate\\Marko Mine\\Flowrate")
 
 # Importing the libraries
 import numpy as np
@@ -27,30 +27,34 @@ weather = weather.drop('Date/Time', 1)
 # =============================================================================
 # Missing weather data filling
 # =============================================================================
-'''
-monthly_mean = pd.DataFrame()
-monthly_mean['Mean Temp (°C)_1'] = weather.groupby('Month')['Mean Temp (°C)'].mean()
-monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
-monthly_mean['Total Snow (cm)_1'] = weather.groupby('Month')['Total Snow (cm)'].mean()
-monthly_mean['Total Precip (mm)_1'] = weather.groupby('Month')['Total Precip (mm)'].mean()
-monthly_mean['Snow on Grnd (cm)_1'] = weather.groupby('Month')['Snow on Grnd (cm)'].mean()
-monthly_mean['Month'] = monthly_mean.index
+try:
+    weather = pd.read_csv('Weather_filled.csv').drop('Num', 1)
+    weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
+    print('Filled weather data loaded successfully')
+except:
+    print('Filled weather data not detected, generating')
+    monthly_mean = pd.DataFrame()
+    monthly_mean['Mean Temp (°C)_1'] = weather.groupby('Month')['Mean Temp (°C)'].mean()
+    monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
+    monthly_mean['Total Snow (cm)_1'] = weather.groupby('Month')['Total Snow (cm)'].mean()
+    monthly_mean['Total Precip (mm)_1'] = weather.groupby('Month')['Total Precip (mm)'].mean()
+    monthly_mean['Snow on Grnd (cm)_1'] = weather.groupby('Month')['Snow on Grnd (cm)'].mean()
+    monthly_mean['Month'] = monthly_mean.index
+    
+    weather_copy = weather.copy()
+    monthly_mean.index = range(1, 13)#for 12 months, the name of index must be removed
+    weather_copy = pd.merge(weather, monthly_mean, on=('Month'), how='left')
 
-weather_copy = weather.copy()
-monthly_mean.index = range(1, 13)#for 12 months, the name of index must be removed
-weather_copy = pd.merge(weather, monthly_mean, on=('Month'), how='left')
+    for i in ['Mean Temp (°C)', 'Total Rain (mm)', 'Total Snow (cm)', 'Total Precip (mm)', 'Snow on Grnd (cm)']:
+        for j in range(0, len(weather_copy)):
+            if weather_copy[i].isnull()[j]:
+                weather_copy.loc[j, i] = weather_copy[i+'_1'][j]
+    weather = weather_copy.drop(columns=['Mean Temp (°C)_1', 'Total Rain (mm)_1', 
+                                         'Total Snow (cm)_1', 'Total Precip (mm)_1',
+                                         'Snow on Grnd (cm)_1'])
+    pd.DataFrame(weather).to_csv('Weather_filled.csv')
+    print('Filled weather data saved successfully')
 
-for i in ['Mean Temp (°C)', 'Total Rain (mm)', 'Total Snow (cm)', 'Total Precip (mm)', 'Snow on Grnd (cm)']:
-    for j in range(0, len(weather_copy)):
-        if weather_copy[i].isnull()[j]:
-            weather_copy.loc[j, i] = weather_copy[i+'_1'][j]
-weather = weather_copy.drop(columns=['Mean Temp (°C)_1', 'Total Rain (mm)_1', 
-                                     'Total Snow (cm)_1', 'Total Precip (mm)_1',
-                                     'Snow on Grnd (cm)_1'])
-'''
-#pd.DataFrame(weather).to_csv('Weather_filled.csv')
-weather = pd.read_csv('Weather_filled.csv').drop('Num', 1)
-weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
 # =============================================================================
 # Generating melting data
 # =============================================================================
@@ -152,34 +156,42 @@ def rootMSE(y_test, y_pred):
 # =============================================================================
 # Decision Tree
 # =============================================================================
-'''
-from sklearn.tree import DecisionTreeClassifier
-classifier = DecisionTreeClassifier()# Use 'entropy' instead of 'gini'
-
-# Grid searching
-from sklearn.model_selection import GridSearchCV
-parameters = {'criterion':('gini', 'entropy')}
-clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
-clf.fit(X_scaled, y.astype('int'))
-print('Best score:', clf.best_score_)
-print('Best parameters:', clf.best_params_)
-
-# Training the classifier with best hyperparameters
-classifier = DecisionTreeClassifier(criterion=clf.best_params_.get('criterion'),
-                                    random_state=1029)
-classifier.fit(X_scaled, y.astype('int'))
-
-# Prediction
-print('For DecisionTreeClassifier: ')
-y_pred = predict_test(X_scaled_test, classifier)
-accuracy = accuracy_print_conf(y_test, y_pred)
-#springFS_pred_test = y_pred.copy()
-
-from joblib import dump
-dump(classifier, 'DecisionTreeForLSTM.joblib')
-'''
-from joblib import load
-classifier = load('DecisionTreeForLSTM.joblib')
+try: 
+    from joblib import load
+    classifier = load('DecisionTreeForLSTM.joblib')
+    print('Trained decision tree result loaded successfully')
+    # Prediction
+    print('For DecisionTreeClassifier: ')
+    y_pred = predict_test(X_scaled_test, classifier)
+    accuracy = accuracy_print_conf(y_test, y_pred)
+    #springFS_pred_test = y_pred.copy()
+except:
+    print('No training result detected, training...')
+    from sklearn.tree import DecisionTreeClassifier
+    classifier = DecisionTreeClassifier()# Use 'entropy' instead of 'gini'
+    
+    # Grid searching
+    from sklearn.model_selection import GridSearchCV
+    parameters = {'criterion':('gini', 'entropy')}
+    clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
+    clf.fit(X_scaled, y.astype('int'))
+    print('Best score:', clf.best_score_)
+    print('Best parameters:', clf.best_params_)
+    
+    # Training the classifier with best hyperparameters
+    classifier = DecisionTreeClassifier(criterion=clf.best_params_.get('criterion'),
+                                        random_state=1029)
+    classifier.fit(X_scaled, y.astype('int'))
+    
+    # Prediction
+    print('For DecisionTreeClassifier: ')
+    y_pred = predict_test(X_scaled_test, classifier)
+    accuracy = accuracy_print_conf(y_test, y_pred)
+    #springFS_pred_test = y_pred.copy()
+    
+    from joblib import dump
+    dump(classifier, 'DecisionTreeForLSTM.joblib')
+    print('Decision tree training result saved')
 
 # =============================================================================
 # LSTM
