@@ -32,7 +32,7 @@ try:
     weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
     print('Filled weather data loaded successfully')
 except:
-    print('Filled weather data not detected, generating')
+    print('Filled weather data not detected, generating...')
     monthly_mean = pd.DataFrame()
     monthly_mean['Mean Temp (°C)_1'] = weather.groupby('Month')['Mean Temp (°C)'].mean()
     monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
@@ -90,42 +90,18 @@ X = np.c_[day0, day_1]
 X = pd.DataFrame(X, index=X[:, 8])
 X.dropna(inplace=True)
 
-# One_Hot Encoding
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder
-ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
-X = ct.fit_transform(X)
-X = pd.DataFrame(X, index=X[:, 19])
-
-test = X.loc['2013-01-01':'2013-12-31'].values
+X_test = X.loc['2013-01-01':'2013-12-31'].values
 X = X.loc['1992-01-01':'2013-01-01'].values#Changed
-datetime = X[:, 19]
-y = X[:, 20]
-X = np.c_[X[:, :19], X[:, 21:]]
-
-# Seperating results of One_Hot encoding
-X_month = X[:, :11]
-X = X[:, 12:]
-
-# Feature scaling for both X and y
-from sklearn.preprocessing import StandardScaler
-sc_X = StandardScaler()
-X_scaled = sc_X.fit_transform(X)
-X_scaled = np.c_[X_month, X_scaled]
+datetime = X[:, 8]
+y = X[:, 9]
+X = np.c_[X[:, :8], X[:, 10:]]
 
 # =============================================================================
 # Transforming test set
 # =============================================================================
-datetime_test = test[:, 19]
-y_test = test[:, 20]
-test = np.c_[test[:, :19], test[:, 21:]]
-
-# Seperating results of One_Hot encoding
-X_month_test = test[:, :11]
-test = test[:, 12:]
-
-X_scaled_test = sc_X.transform(test)
-X_scaled_test = np.c_[X_month_test, X_scaled_test]
+datetime_test = X_test[:, 8]
+y_test = X_test[:, 9]
+X_test = np.c_[X_test[:, :8], X_test[:, 10:]]
 
 # =============================================================================
 # Defining functions
@@ -156,15 +132,12 @@ def rootMSE(y_test, y_pred):
 # =============================================================================
 # Decision Tree
 # =============================================================================
-try: 
+# Fixing a seed
+seed = 1029
+try:
     from joblib import load
     classifier = load('DecisionTreeForLSTM.joblib')
     print('Trained decision tree result loaded successfully')
-    # Prediction
-    print('For DecisionTreeClassifier: ')
-    y_pred = predict_test(X_scaled_test, classifier)
-    accuracy = accuracy_print_conf(y_test, y_pred)
-    #springFS_pred_test = y_pred.copy()
 except:
     print('No training result detected, training...')
     from sklearn.tree import DecisionTreeClassifier
@@ -172,26 +145,60 @@ except:
     
     # Grid searching
     from sklearn.model_selection import GridSearchCV
-    parameters = {'criterion':('gini', 'entropy')}
+    parameters = {'criterion':('gini', 'entropy'),
+                  'min_weight_fraction_leaf':(0.1, 0.01, 0.001)}
     clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
-    clf.fit(X_scaled, y.astype('int'))
+    clf.fit(X, y.astype('int'))
     print('Best score:', clf.best_score_)
     print('Best parameters:', clf.best_params_)
     
     # Training the classifier with best hyperparameters
     classifier = DecisionTreeClassifier(criterion=clf.best_params_.get('criterion'),
-                                        random_state=1029)
-    classifier.fit(X_scaled, y.astype('int'))
-    
-    # Prediction
-    print('For DecisionTreeClassifier: ')
-    y_pred = predict_test(X_scaled_test, classifier)
-    accuracy = accuracy_print_conf(y_test, y_pred)
-    #springFS_pred_test = y_pred.copy()
+                                        min_weight_fraction_leaf=clf.best_params_.get('min_weight_fraction_leaf'),
+                                        random_state=seed)
+    classifier.fit(X, y.astype('int'))
     
     from joblib import dump
     dump(classifier, 'DecisionTreeForLSTM.joblib')
     print('Decision tree training result saved')
+
+# Prediction
+print('For DecisionTreeClassifier: ')
+y_pred = predict_test(X_test, classifier)
+accuracy = accuracy_print_conf(y_test, y_pred)
+
+#Indicator calculating
+from sklearn.metrics import roc_auc_score, classification_report
+dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
+print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
+print(classification_report(np.int32(y_test), y_pred))
+#springFS_pred_test = y_pred.copy()
+
+# =============================================================================
+# Visualization of the tree
+# =============================================================================
+from sklearn.tree import export_graphviz
+from IPython.display import Image
+from six import StringIO
+import pydotplus
+# Need installing GraphViz and pydotplus
+feature_names = pd.DataFrame(weather.columns[:-1])
+feature_names = feature_names.append(pd.DataFrame(weather.columns[3:-1]))
+feature_names = np.array(feature_names).tolist()
+# 文件缓存
+dot_data = StringIO()
+# 将决策树导入到dot中
+export_graphviz(classifier, out_file=dot_data,  
+                filled=True, rounded=True,
+                special_characters=True,
+                feature_names = feature_names,
+                class_names=['NotSF','SF'])
+# 将生成的dot文件生成graph
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
+# 将结果存入到png文件中
+graph.write_png('Decision_tree.png')
+# 显示
+Image(graph.create_png())
 
 # =============================================================================
 # LSTM
@@ -207,29 +214,20 @@ train = merge.loc['1992-01-01':'2012-12-04'].drop(8,1).values#Changed
 
 # Building X for decision tree
 X_DT = np.c_[train[1:,:8], train[:-1, 3:8]]
-test_DT = np.c_[test[1:,:8], test[:-1, 3:8]]
-ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
-X_DT = ct.fit_transform(X_DT)
-X_month = X_DT[:, :11]
-X_DT = X_DT[:, 12:]
-sc_X = StandardScaler()
-X_DT_scaled = sc_X.fit_transform(X_DT)
-X_DT_scaled = np.c_[X_month, X_DT_scaled]
-
-test_DT = ct.transform(test_DT)
-X_month = test_DT[:, :11]
-test_DT = test_DT[:, 12:]
-test_DT_scaled = sc_X.transform(test_DT)
-test_DT_scaled = np.c_[X_month, test_DT_scaled]
+X_test_DT = np.c_[test[1:,:8], test[:-1, 3:8]]
 
 # Predicting spring F.S. by the decision tree classifier
-melt_train = classifier.predict(X_DT_scaled)
-melt_test = classifier.predict(test_DT_scaled)
+melt_train = classifier.predict(X_DT)
+melt_test = classifier.predict(X_test_DT)
 
 train[1:, 8] = melt_train
 test[1:, 8] = melt_test
 train = np.array(train[1:, :])
 test = np.array(test[1:, :])
+
+# One_Hot Encoding
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
 
 ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
 train = ct.fit_transform(train)
@@ -279,8 +277,6 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
 
-# Fixing a seed
-seed = 1029
 np.random.seed(seed)
 
 for time_step in (5, 10, 50):
@@ -309,7 +305,6 @@ for time_step in (5, 10, 50):
                   'dropoutRate':(0, 0.1, 0.2, 0.3),
                   'constraints':(3, 50, 99)}
     
-    from sklearn.model_selection import GridSearchCV
     clf = GridSearchCV(regressor, parameters, n_jobs=-1, cv=5)
     clf.fit(X_train, y_train)
     print('Best score:', clf.best_score_)
@@ -409,19 +404,13 @@ regressor.save_weights('./FRO_KC1_')
 weather_2013 = pd.read_csv('Weather_filled2013.csv').drop('Num', 1).drop('Datetime', 1)
 weather_2013 = np.array(weather_2013)
 
-test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
-ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
-test_DT = ct.fit_transform(test_DT)
-X_month = test_DT[:, :11]
-test_DT = test_DT[:, 12:]
-test_DT_scaled = sc_X.transform(test_DT)#fitted by Decision Tree model
-test_DT_scaled = np.c_[X_month, test_DT_scaled]
+X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
 
-melt_test = classifier.predict(test_DT_scaled)
-test_DT = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,2: ], melt_test]
+melt_test = classifier.predict(X_test_DT)
+X_test = np.c_[ weather_2013[1:, 0], weather_2013[1:,2: ], melt_test]
 
-test_DT = np.c_[test_DT, np.zeros(len(test_DT))]
-scaled_test = scaler.transform(test_DT)
+test = np.c_[X_test, np.zeros(len(X_test))]
+scaled_test = scaler.transform(test)
 scaled_test = scaled_test[:, :-1]
 
 time_step = 50
