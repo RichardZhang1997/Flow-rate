@@ -134,6 +134,7 @@ def rootMSE(y_test, y_pred):
 # =============================================================================
 # Fixing a seed
 seed = 1029
+np.random.seed(seed)
 try:
     from joblib import load
     classifier = load('DecisionTreeForLSTM.joblib')
@@ -277,8 +278,6 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
 
-np.random.seed(seed)
-
 for time_step in (5, 10, 50):
     print('Below are results for time_step:', time_step)
     X_train, y_train, y_train_not_scaled = [], [], []
@@ -350,26 +349,42 @@ for i in range(time_step, len(test)):
         y_test.append(scaled_test[i, -1])
         y_test_not_scaled.append(test[i, -1])
 X_test, y_test = np.array(X_test), np.array(y_test)
+'''
 from sklearn.model_selection import KFold
 kfold = KFold(5, shuffle=True, random_state=seed)
 for train, valid in kfold.split(X_train):
     print('train: %s, test: %s' %(X_train[train], X_train[valid]))
 '''
+
+'''
 To be continued
 '''
-
+try:
+    best_neurons = clf.best_params_.get('neurons')
+    best_dropoutRate = clf.best_params_.get('dropoutRate')
+    best_constraints = clf.best_params_.get('constraints')
+except:
+    best_neurons = 50
+    best_dropoutRate = 0.1
+    best_constraints = 99
 # Creating the model
-regressor = create_LSTM(neurons=10,
-                        dropoutRate=0.1,
-                        constraints=2)
-#regressor.fit(X_train, y_train, epochs=5, batch_size=16)
+regressor = create_LSTM(neurons=best_neurons,
+                        dropoutRate=best_dropoutRate,
+                        constraints=best_constraints)
+#r = regressor.fit(X_train, y_train, epochs=50, batch_size=16)
 # Using early stopping to train the model
-early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, 
+early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, 
                                             min_delta=0, restore_best_weights=True)
-regressor.fit(X_train, y_train, epochs=50, batch_size=16, 
-              callbacks=[early_stop_callback], validation_split=0.1)#转换成在validation set 上面验证
+r = regressor.fit(X_train, y_train, epochs=50, batch_size=16, 
+              callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
 #Stopped val_loss=0.0036
 #接住这个返回值可以画出loss曲线，用尽量大的epoch画图，看是否只是fluctuation
+# Plot loss per iteration
+import matplotlib.pyplot as plt
+plt.plot(r.history['loss'], label='loss')
+plt.plot(r.history['val_loss'], label='val_loss')
+plt.legend()
+plt.show()
 
 if early_stop_callback.stopped_epoch == 0:
     early_epoch = 50
@@ -378,10 +393,13 @@ else:
     
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
-regressor = create_LSTM(neurons=10,
-                        dropoutRate=0.1,
-                        constraints=2)
-regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=16)
+regressor = create_LSTM(neurons=best_neurons,
+                        dropoutRate=best_dropoutRate,
+                        constraints=best_constraints)
+r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=16)
+plt.plot(r.history['loss'], label='loss')
+plt.legend()
+plt.show()
 
 y_pred_scaled = regressor.predict(X_test)
 sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
@@ -407,7 +425,11 @@ weather_2013 = np.array(weather_2013)
 X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
 
 melt_test = classifier.predict(X_test_DT)
-X_test = np.c_[ weather_2013[1:, 0], weather_2013[1:,2: ], melt_test]
+
+ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
+X_test = ct.fit_transform(X_test_DT)
+X_month = X_test[:, :11]
+X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,2: ], melt_test]
 
 test = np.c_[X_test, np.zeros(len(X_test))]
 scaled_test = scaler.transform(test)
@@ -427,4 +449,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('pred_whole_2013.csv',y_pred,fmt='%f',delimiter=',')
+np.savetxt('temp_pred_whole_2013.csv',y_pred,fmt='%f',delimiter=',')
