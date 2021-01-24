@@ -73,17 +73,19 @@ flowrate['melt'] = melt
 merge = pd.merge(weather, flowrate, on=('Datetime'), how='left').drop('flow', 1)
 merge = np.array(merge)
 
-day0, day_1, day_2 = [], [], []
+day0 = []
+#day_1, day_2 = [], []#for more than 2 days
 for i in range(0, len(merge)):
     if merge[i][9] == 0 or merge[i][9] == 1:
         day0.append(merge[i, :])
-        day_1.append(merge[i-1, 3:8])#start/end columns are to be changed, check by hand
-        day_2.append(merge[i-2, 3:8])
-day0 ,day_1, day_2 = np.array(day0), np.array(day_1), np.array(day_2)
+        #day_1.append(merge[i-1, 3:8])#start/end columns are to be changed, check by hand
+        #day_2.append(merge[i-2, 3:8])
+day0 = np.array(day0)
+#day_1, day_2 = np.array(day_1), np.array(day_2)#for more than 2 days
 
-# Switch of 1day, 2days or 3days
-#X = day0.copy()
-X = np.c_[day0, day_1]
+# Switch of 1 day, 2 days or 3 days
+X = day0.copy()
+#X = np.c_[day0, day_1]
 #X = np.c_[day0, day_1, day_2]
 
 # Transfer to dataframe and seperate to train, valid and test set
@@ -94,14 +96,14 @@ X_test = X.loc['2013-01-01':'2013-12-31'].values
 X = X.loc['1992-01-01':'2013-01-01'].values#Changed
 datetime = X[:, 8]
 y = X[:, 9]
-X = np.c_[X[:, :8], X[:, 10:]]
+X = X[:, :8]#X = np.c_[X[:, :8], X[:, 10:]]#for more than 2 days
 
 # =============================================================================
 # Transforming test set
 # =============================================================================
 datetime_test = X_test[:, 8]
 y_test = X_test[:, 9]
-X_test = np.c_[X_test[:, :8], X_test[:, 10:]]
+X_test = X_test[:, :8]#X_test = np.c_[X_test[:, :8], X_test[:, 10:]]#for more than 2 days
 
 # =============================================================================
 # Defining functions
@@ -147,7 +149,7 @@ except:
     # Grid searching
     from sklearn.model_selection import GridSearchCV
     parameters = {'criterion':('gini', 'entropy'),
-                  'min_weight_fraction_leaf':(0.1, 0.01, 0.001)}
+                  'min_weight_fraction_leaf':(0.1, 0.01)}
     clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
     clf.fit(X, y.astype('int'))
     print('Best score:', clf.best_score_)
@@ -182,7 +184,7 @@ from sklearn.tree import export_graphviz
 from IPython.display import Image
 from six import StringIO
 import pydotplus
-# Need installing GraphViz and pydotplus
+# Need to install GraphViz and pydotplus
 feature_names = pd.DataFrame(weather.columns[:-1])
 feature_names = feature_names.append(pd.DataFrame(weather.columns[3:-1]))
 feature_names = np.array(feature_names).tolist()
