@@ -10,7 +10,7 @@ os.chdir("C:\\MyFile\\Study\\Graduate\\Marko Mine\\Flowrate")
 
 # Importing the libraries
 import numpy as np
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import pandas as pd
 
 # Loading datasets
@@ -24,6 +24,8 @@ weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 flowrate = flowrate.drop('sample_date', 1)
 weather = weather.drop('Date/Time', 1)
 
+print(flowrate.describe())
+print(weather.describe())
 # =============================================================================
 # Missing weather data filling
 # =============================================================================
@@ -211,6 +213,53 @@ merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge = np.array(merge)
 merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
+
+# =============================================================================
+# EDA
+# =============================================================================
+#Correlation analysis
+import seaborn as sns
+feature_names = pd.DataFrame(weather.columns[:-1])
+feature_names = np.array(feature_names)
+feature_names = np.append(feature_names,'Flowrate\n(m^3/s)')
+corr = merge.drop(8,1).drop(9,1).apply(lambda x:x.astype(float)).corr()
+sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names)
+
+#Features importance analysis of decision tree
+importances = classifier.feature_importances_#get importance
+indices = np.argsort(importances)[::-1]#get the order of features
+plt.figure(figsize=(12,6))
+plt.title("Feature importances by Decision Tree")
+plt.bar(range(len(indices)), importances[indices], color='lightblue',  align="center")
+plt.step(range(len(indices)), np.cumsum(importances[indices]), where='mid', label='Cumulative')
+plt.xticks(range(len(indices)), feature_names[indices], rotation='vertical',fontsize=14)
+plt.xlim([-1, len(indices)])
+plt.show()
+
+#ROC plot
+from sklearn.metrics import roc_curve
+dt_fpr, dt_tpr, dt_thresholds = roc_curve(np.int32(y_test), classifier.predict_proba(X_test)[:,1])
+plt.figure()
+plt.plot(dt_fpr, dt_tpr, label='Decision Tree (area = %0.2f)' % dt_roc_auc, marker='o')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.plot([0, 1], [0, 1], 'r--')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Graph')
+plt.legend(loc="lower right")
+plt.show()
+'''
+sklearn.metrics.roc_curve(y_true, y_score, *, pos_label=None, sample_weight=None, drop_intermediate=True)
+y_scorendarray of shape (n_samples,)
+Target scores, can either be probability estimates of the positive class, confidence values, or non-thresholded measure of decisions (as returned by “decision_function” on some classifiers).
+thresholdsndarray of shape = (n_thresholds,)
+Decreasing thresholds on the decision function used to compute fpr and tpr. thresholds[0] represents no instances being predicted and is arbitrarily set to max(y_score) + 1.
+'''
+
+# =============================================================================
+# LSTM continue
+# =============================================================================
 test = merge.loc['2012-12-04':'2013-12-31'].drop(8,1).values
 #valid = merge.loc['2012-01-01':'2012-12-31'].drop(8,1).values
 train = merge.loc['1992-01-01':'2012-12-04'].drop(8,1).values#Changed
@@ -382,7 +431,6 @@ r = regressor.fit(X_train, y_train, epochs=50, batch_size=16,
 #Stopped val_loss=0.0036
 #接住这个返回值可以画出loss曲线，用尽量大的epoch画图，看是否只是fluctuation
 # Plot loss per iteration
-import matplotlib.pyplot as plt
 plt.plot(r.history['loss'], label='loss')
 plt.plot(r.history['val_loss'], label='val_loss')
 plt.legend()
