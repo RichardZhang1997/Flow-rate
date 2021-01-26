@@ -14,15 +14,24 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Loading datasets
+#flowrate = pd.read_csv('Daily__Nov-5-2020_08_47_30PM.csv', usecols=[2, 3])#for 08NK022 station
 flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
 weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
                       usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
 
 # Converting date string to datetime
+#flowrate['Datetime'] = pd.to_datetime(flowrate['Date'], format='%Y/%m/%d')
 flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d')
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
+#flowrate = flowrate.drop('Date', 1)
 flowrate = flowrate.drop('sample_date', 1)
 weather = weather.drop('Date/Time', 1)
+
+#flow rate histogram to help to decide what should the threshold of SF be
+plt.hist(x=flowrate['flow'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
+#总面积一定
+plt.title('Flow rate distribution', pad=10)#pad是标题离圆心的距离
+plt.show()
 
 print(flowrate.describe())
 print(weather.describe())
