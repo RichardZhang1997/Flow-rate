@@ -265,17 +265,23 @@ test = merge.loc['2012-12-04':'2013-12-31'].drop(8,1).values
 train = merge.loc['1992-01-01':'2012-12-04'].drop(8,1).values#Changed
 
 # Building X for decision tree
-X_DT = np.c_[train[1:,:8], train[:-1, 3:8]]
-X_test_DT = np.c_[test[1:,:8], test[:-1, 3:8]]
+X_DT = np.array(train[:,:8])
+X_test_DT = np.array(test[:,:8])
+#X_DT = np.c_[train[1:,:8], train[:-1, 3:8]]#for more than one days
+#X_test_DT = np.c_[test[1:,:8], test[:-1, 3:8]]#for more than one days
 
 # Predicting spring F.S. by the decision tree classifier
 melt_train = classifier.predict(X_DT)
 melt_test = classifier.predict(X_test_DT)
 
-train[1:, 8] = melt_train
-test[1:, 8] = melt_test
-train = np.array(train[1:, :])
-test = np.array(test[1:, :])
+train[:, 8] = melt_train
+test[:, 8] = melt_test
+#train[1:, 8] = melt_train
+#test[1:, 8] = melt_test
+train = np.array(train[:, :])
+test = np.array(test[:, :])
+#train = np.array(train[1:, :])
+#test = np.array(test[1:, :])
 
 # One_Hot Encoding
 from sklearn.compose import ColumnTransformer
@@ -425,7 +431,7 @@ regressor = create_LSTM(neurons=best_neurons,
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=16)
 # Using early stopping to train the model
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, 
-                                            min_delta=0, restore_best_weights=True)
+                                            min_delta=0, restore_best_weights=True)#change patience number
 r = regressor.fit(X_train, y_train, epochs=50, batch_size=16, 
               callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
 #Stopped val_loss=0.0036
