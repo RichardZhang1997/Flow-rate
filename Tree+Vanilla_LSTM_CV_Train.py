@@ -13,28 +13,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+###############################################################################
 # Loading datasets
-#flowrate = pd.read_csv('Daily__Nov-5-2020_08_47_30PM.csv', usecols=[2, 3])#for 08NK022 station
-flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
-weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
-                      usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+#flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
+flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
+###############################################################################
 
+flowrate.columns = ['sample_date', 'flow']
 # Converting date string to datetime
-#flowrate['Datetime'] = pd.to_datetime(flowrate['Date'], format='%Y/%m/%d')
 flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d')
-weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
-#flowrate = flowrate.drop('Date', 1)
 flowrate = flowrate.drop('sample_date', 1)
-weather = weather.drop('Date/Time', 1)
-
+'''
 #flow rate histogram to help to decide what should the threshold of SF be
 plt.hist(x=flowrate['flow'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
 #总面积一定
 plt.title('Flow rate distribution', pad=10)#pad是标题离圆心的距离
 plt.show()
-
+'''
 print(flowrate.describe())
-print(weather.describe())
 # =============================================================================
 # Missing weather data filling
 # =============================================================================
@@ -44,6 +47,11 @@ try:
     print('Filled weather data loaded successfully')
 except:
     print('Filled weather data not detected, generating...')
+    weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
+                      usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+    weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
+    weather = weather.drop('Date/Time', 1)
+    print(weather.describe())
     monthly_mean = pd.DataFrame()
     monthly_mean['Mean Temp (°C)_1'] = weather.groupby('Month')['Mean Temp (°C)'].mean()
     monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
@@ -69,7 +77,7 @@ except:
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 2
+flowrate_threshold = 0.1
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -104,17 +112,21 @@ X = pd.DataFrame(X, index=X[:, 8])
 X.dropna(inplace=True)
 
 X_test = X.loc['2013-01-01':'2013-12-31'].values
-X = X.loc['1992-01-01':'2013-01-01'].values#Changed
+X = X.loc['1990-01-01':'2013-01-01'].values#Changed
 datetime = X[:, 8]
 y = X[:, 9]
-X = X[:, :8]#X = np.c_[X[:, :8], X[:, 10:]]#for more than 2 days
+X = X[:, 1:8]
+#X = np.c_[X[:, 1:8], X[:, 10:]]#for more than 2 days
+#eliminate 'year' from the inputX = X[:, 1:8] 
 
 # =============================================================================
 # Transforming test set
 # =============================================================================
 datetime_test = X_test[:, 8]
 y_test = X_test[:, 9]
-X_test = X_test[:, :8]#X_test = np.c_[X_test[:, :8], X_test[:, 10:]]#for more than 2 days
+X_test = X_test[:, 1:8]
+#X_test = np.c_[X_test[:, 1:8], X_test[:, 10:]]#for more than 2 days
+#X = X[:, 1:8] eliminate 'year' from the input
 
 # =============================================================================
 # Defining functions
@@ -150,7 +162,7 @@ seed = 1029
 np.random.seed(seed)
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM.joblib')
+    classifier = load('DecisionTreeForLSTM_EVO_BC1.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -173,7 +185,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM.joblib')
+    dump(classifier, 'DecisionTreeForLSTM_EVO_BC1.joblib')
     print('Decision tree training result saved')
 
 # Prediction
@@ -196,8 +208,8 @@ from IPython.display import Image
 from six import StringIO
 import pydotplus
 # Need to install GraphViz and pydotplus
-feature_names = pd.DataFrame(weather.columns[:-1])
-feature_names = feature_names.append(pd.DataFrame(weather.columns[3:-1]))
+feature_names = pd.DataFrame(weather.columns[1:-1])#eliminate 'year' feature name
+#feature_names = feature_names.append(pd.DataFrame(weather.columns[3:-1]))#for more than 1 day
 feature_names = np.array(feature_names).tolist()
 # 文件缓存
 dot_data = StringIO()
@@ -210,7 +222,7 @@ export_graphviz(classifier, out_file=dot_data,
 # 将生成的dot文件生成graph
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
 # 将结果存入到png文件中
-graph.write_png('Decision_tree.png')
+graph.write_png('Decision_tree_FRO_HC1.png')
 # 显示
 Image(graph.create_png())
 
@@ -238,7 +250,7 @@ sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names)
 importances = classifier.feature_importances_#get importance
 indices = np.argsort(importances)[::-1]#get the order of features
 plt.figure(figsize=(12,6))
-plt.title("Feature importances by Decision Tree")
+plt.title("Feature importance by Decision Tree")
 plt.bar(range(len(indices)), importances[indices], color='lightblue',  align="center")
 plt.step(range(len(indices)), np.cumsum(importances[indices]), where='mid', label='Cumulative')
 plt.xticks(range(len(indices)), feature_names[indices], rotation='vertical',fontsize=14)
