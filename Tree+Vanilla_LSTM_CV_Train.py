@@ -18,12 +18,14 @@ import pandas as pd
 #flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
 #flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
+flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
-flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
 ###############################################################################
 
 flowrate.columns = ['sample_date', 'flow']
@@ -77,7 +79,7 @@ except:
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 0.1
+flowrate_threshold = 0.07
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -162,7 +164,7 @@ seed = 1029
 np.random.seed(seed)
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_EVO_BC1.joblib')
+    classifier = load('DecisionTreeForLSTM_GHO_PC1.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -185,7 +187,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_EVO_BC1.joblib')
+    dump(classifier, 'DecisionTreeForLSTM_GHO_PC1.joblib')
     print('Decision tree training result saved')
 
 # Prediction
