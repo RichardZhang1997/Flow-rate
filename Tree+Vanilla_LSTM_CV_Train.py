@@ -15,10 +15,10 @@ import pandas as pd
 
 ###############################################################################
 # Loading datasets
-#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
 #flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
@@ -79,7 +79,7 @@ except:
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 0.07
+flowrate_threshold = 2
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -164,7 +164,7 @@ seed = 1029
 np.random.seed(seed)
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_GHO_PC1.joblib')
+    classifier = load('DecisionTreeForLSTM_FRO_KC1.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -187,7 +187,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_GHO_PC1.joblib')
+    dump(classifier, 'DecisionTreeForLSTM_GHO_PC1.joblib')#To be changed
     print('Decision tree training result saved')
 
 # Prediction
@@ -288,10 +288,10 @@ test = merge.loc['2012-12-04':'2013-12-31'].drop(8,1).values
 train = merge.loc['1992-01-01':'2012-12-04'].drop(8,1).values#Changed
 
 # Building X for decision tree
-X_DT = np.array(train[:,:8])
-X_test_DT = np.array(test[:,:8])
-#X_DT = np.c_[train[1:,:8], train[:-1, 3:8]]#for more than one days
-#X_test_DT = np.c_[test[1:,:8], test[:-1, 3:8]]#for more than one days
+X_DT = np.array(train[:,1:8])#eliminate 'year' feature
+X_test_DT = np.array(test[:,1:8])#eliminate 'year' feature
+#X_DT = np.c_[train[1:,1:8], train[:-1, 3:8]]#for more than one days
+#X_test_DT = np.c_[test[1:,1:8], test[:-1, 3:8]]#for more than one days
 
 # Predicting spring F.S. by the decision tree classifier
 melt_train = classifier.predict(X_DT)
@@ -327,7 +327,7 @@ from keras.layers import Dense, LSTM
 from keras.constraints import max_norm
 import tensorflow as tf
 
-opt = tf.keras.optimizers.Adam(learning_rate=0.001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CVTraining 确定
+opt = tf.keras.optimizers.Adam(learning_rate=0.0001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CVTraining 确定
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
@@ -453,9 +453,9 @@ regressor = create_LSTM(neurons=best_neurons,
                         constraints=best_constraints)
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=16)
 # Using early stopping to train the model
-early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, 
+early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, 
                                             min_delta=0, restore_best_weights=True)#change patience number
-r = regressor.fit(X_train, y_train, epochs=50, batch_size=16, 
+r = regressor.fit(X_train, y_train, epochs=50, batch_size=8, 
               callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
 #Stopped val_loss=0.0036
 #接住这个返回值可以画出loss曲线，用尽量大的epoch画图，看是否只是fluctuation
@@ -475,7 +475,7 @@ print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=best_constraints)
-r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=16)
+r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=8)
 plt.plot(r.history['loss'], label='loss')
 plt.legend()
 plt.show()
