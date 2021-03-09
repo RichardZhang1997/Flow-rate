@@ -24,7 +24,7 @@ flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
 #flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
+##flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
 ###############################################################################
 
@@ -32,14 +32,9 @@ flowrate.columns = ['sample_date', 'flow']
 # Converting date string to datetime
 flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d')
 flowrate = flowrate.drop('sample_date', 1)
-'''
-#flow rate histogram to help to decide what should the threshold of SF be
-plt.hist(x=flowrate['flow'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
-#总面积一定
-plt.title('Flow rate distribution', pad=10)#pad是标题离圆心的距离
-plt.show()
-'''
-print(flowrate.describe())
+
+#print(flowrate.describe())
+
 # =============================================================================
 # Missing weather data filling
 # =============================================================================
@@ -187,7 +182,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_GHO_PC1.joblib')#To be changed
+    dump(classifier, 'DecisionTreeForLSTM_FRO_KC1.joblib')#To be changed
     print('Decision tree training result saved')
 
 # Prediction
@@ -224,7 +219,7 @@ export_graphviz(classifier, out_file=dot_data,
 # 将生成的dot文件生成graph
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
 # 将结果存入到png文件中
-graph.write_png('Decision_tree_FRO_HC1.png')
+graph.write_png('Visualization\Decision_tree_evaluation\Decision_tree_LCO_LC3.png')
 # 显示
 Image(graph.create_png())
 
@@ -236,23 +231,25 @@ merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge = np.array(merge)
 merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
-
+'''
 # =============================================================================
 # EDA
 # =============================================================================
-#Correlation analysis
-import seaborn as sns
 feature_names = pd.DataFrame(weather.columns[:-1])
 feature_names = np.array(feature_names)
 feature_names = np.append(feature_names,'Flowrate\n(m^3/s)')
+
+#Correlation analysis
+import seaborn as sns
 corr = merge.drop(8,1).drop(9,1).apply(lambda x:x.astype(float)).corr()
 sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names)
 
 #Features importance analysis of decision tree
+feature_names = feature_names[1:-1]
 importances = classifier.feature_importances_#get importance
 indices = np.argsort(importances)[::-1]#get the order of features
 plt.figure(figsize=(12,6))
-plt.title("Feature importance by Decision Tree")
+plt.title("Feature importance by Decision Tree of LCO LC3 Station")
 plt.bar(range(len(indices)), importances[indices], color='lightblue',  align="center")
 plt.step(range(len(indices)), np.cumsum(importances[indices]), where='mid', label='Cumulative')
 plt.xticks(range(len(indices)), feature_names[indices], rotation='vertical',fontsize=14)
@@ -269,9 +266,10 @@ plt.ylim([0.0, 1.05])
 plt.plot([0, 1], [0, 1], 'r--')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('ROC Graph')
+plt.title('ROC Graph of LCO LC3 Station')
 plt.legend(loc="lower right")
 plt.show()
+'''
 '''
 sklearn.metrics.roc_curve(y_true, y_score, *, pos_label=None, sample_weight=None, drop_intermediate=True)
 y_scorendarray of shape (n_samples,)
@@ -484,9 +482,11 @@ y_pred_scaled = regressor.predict(X_test)
 sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
-    
+
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
+
+np.savetxt('FRO_KC1_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
 
 # =============================================================================
 # Saving the training results

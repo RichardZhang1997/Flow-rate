@@ -13,15 +13,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+###############################################################################
 # Loading datasets
-flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+#flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
+flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
+###############################################################################
 weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
                       usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
 
 # Converting date string to datetime
 flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d')
-weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 flowrate = flowrate.drop('sample_date', 1)
+
+weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
 
 # =============================================================================
@@ -49,6 +62,14 @@ weather.groupby('Month')['Total Precip (mm)'].mean().plot.bar(title='Average Tot
 
 weather.groupby('Month')['Snow on Grnd (cm)'].mean().plot.bar(title='Average Snow on Grnd (cm) by Month')
 
+#Flowrate
+flowrate['Year'] = flowrate['Datetime'].dt.year
+flowrate['Month'] = flowrate['Datetime'].dt.month
+flowrate['Day'] = flowrate['Datetime'].dt.day
+
+flowrate.groupby('Month')['report_result_value'].mean().plot.bar(
+    title='Average Flow Rate by Month for EVO EC1 Station')
+
 # Month pie chart
 explode = [0, 0, 0, 0, 0.1, 0.1, 0, 0, 0, 0, 0.15, 0 ]#数字越大突出显示越大
 colors = ['red', 'blue', 'yellow', 'green', 'darkred', 'purple', 'cyan', 'brown', 'orange', 'gray', 'pink', 'crimson']
@@ -71,9 +92,36 @@ plt.pie(x=temp, explode=explode, labels=temp.index, colors=colors,
 plt.title('Average Total Precip (mm) by Month')
 plt.show()
 
+temp = weather.groupby('Month')['Total Snow (cm)'].mean()#.plot.pie(title='Average Total Rain (mm) by Month')
+plt.pie(x=temp, explode=explode, labels=temp.index, colors=colors,
+        autopct='%.1f%%', pctdistance=0.8, labeldistance=1.1, startangle=120,
+        radius=1.2, counterclock=False,
+        wedgeprops={'linewidth':1.5,'edgecolor':'black'},
+        textprops={'fontsize':8, 'color':'black'})#保留一位小数
+plt.title('Average Total Snow (cm) by Month')
+plt.show()
+
+temp = weather.groupby('Month')['Total Precip (mm)'].mean()#.plot.pie(title='Average Total Rain (mm) by Month')
+plt.pie(x=temp, explode=explode, labels=temp.index, colors=colors,
+        autopct='%.1f%%', pctdistance=0.8, labeldistance=1.1, startangle=120,
+        radius=1.2, counterclock=False,
+        wedgeprops={'linewidth':1.5,'edgecolor':'black'},
+        textprops={'fontsize':8, 'color':'black'})#保留一位小数
+plt.title('Average Total Precipitation (mm) by Month')
+plt.show()
+
+temp = weather.groupby('Month')['Snow on Grnd (cm)'].mean()#.plot.pie(title='Average Total Rain (mm) by Month')
+plt.pie(x=temp, explode=explode, labels=temp.index, colors=colors,
+        autopct='%.1f%%', pctdistance=0.8, labeldistance=1.1, startangle=120,
+        radius=1.2, counterclock=False,
+        wedgeprops={'linewidth':1.5,'edgecolor':'black'},
+        textprops={'fontsize':8, 'color':'black'})#保留一位小数
+plt.title('Average Snow Depth (cm) by Month')
+plt.show()
+
 plt.hist(x=flowrate['flow'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
 #总面积一定
-plt.title('Flow rate distribution', pad=10)#pad是标题离圆心的距离
+plt.title('Flow Rate Distribution', pad=10)#pad是标题离圆心的距离
 plt.show()
 
 # =============================================================================
@@ -96,3 +144,42 @@ rain = data_1[:,:,2]
 snow = data_1[:,:,3]
 precip = data_1[:,:,4]
 snow_on_ground = data_1[:,:,5]
+
+#flow rate histogram to help to decide what should the threshold of SF be
+plt.hist(x=flowrate['report_result_value'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
+#总面积一定
+plt.title('EVO EC1 Station Flow Rate Distribution', pad=10)#pad是标题离圆心的距离
+plt.show()
+
+#Weather histogram 
+#Mean Temp (°C)
+plt.hist(x=weather['Mean Temp (°C)'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
+#总面积一定
+plt.title('Mean Temperature Distribution of Sparwood Station', pad=10)#pad是标题离圆心的距离
+plt.show()
+
+#Total Rain (mm)
+plt.hist(x=weather['Total Rain (mm)'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
+#总面积一定
+plt.title('Total Rain Distribution of Sparwood Station', pad=10)#pad是标题离圆心的距离
+plt.show()
+
+#Total Snow (cm)
+plt.hist(x=weather['Total Snow (cm)'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
+#总面积一定
+plt.title('Total Snow Distribution of Sparwood Station', pad=10)#pad是标题离圆心的距离
+plt.show()
+
+#Total Precip (mm)
+plt.hist(x=weather['Total Precip (mm)'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
+#总面积一定
+plt.title('Total Precipitation Distribution of Sparwood Station', pad=10)#pad是标题离圆心的距离
+plt.show()
+
+#Snow on Grnd (cm)
+plt.hist(x=weather['Snow on Grnd (cm)'], bins=48, color='r', edgecolor='black', density=True)#density means y_axis is the frequency instead of values
+#总面积一定
+plt.title('Snow Depth Distribution of Sparwood Station', pad=10)#pad是标题离圆心的距离
+plt.show()
+
+print(weather.describe())
