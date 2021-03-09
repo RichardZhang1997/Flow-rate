@@ -501,14 +501,15 @@ regressor.save_weights('./FRO_KC1_')
 weather_2013 = pd.read_csv('Weather_filled2013.csv').drop('Num', 1).drop('Datetime', 1)
 weather_2013 = np.array(weather_2013)
 
-X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
+X_test_DT = weather_2013[:,1:]
 
 melt_test = classifier.predict(X_test_DT)
 
 ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
+X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
 X_test = ct.fit_transform(X_test_DT)
 X_month = X_test[:, :11]
-X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,2: ], melt_test]
+X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,2: ], melt_test[1:]]
 
 test = np.c_[X_test, np.zeros(len(X_test))]
 scaled_test = scaler.transform(test)
