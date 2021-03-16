@@ -283,7 +283,7 @@ Decreasing thresholds on the decision function used to compute fpr and tpr. thre
 # =============================================================================
 test = merge.loc['2012-12-04':'2013-12-31'].drop(8,1).values
 #valid = merge.loc['2012-01-01':'2012-12-31'].drop(8,1).values
-train = merge.loc['1992-01-01':'2012-12-04'].drop(8,1).values#Changed
+train = merge.loc['1990-01-01':'2012-12-04'].drop(8,1).values#Changed
 
 # Building X for decision tree
 X_DT = np.array(train[:,1:8])#eliminate 'year' feature
@@ -355,7 +355,11 @@ def create_LSTM(neurons, dropoutRate, constraints):
     # Compiling the RNN by usign right optimizer and right loss function
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
-
+'''
+To be continued: Defining training parameters: 
+    epochs_max, batch_size, patience, validation_ratio, cv_num
+'''
+from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 for time_step in (5, 10, 50):
     print('Below are results for time_step:', time_step)
     X_train, y_train, y_train_not_scaled = [], [], []
@@ -376,8 +380,7 @@ for time_step in (5, 10, 50):
     X_test, y_test = np.array(X_test), np.array(y_test)
     
     # Creating the model
-    from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
-    regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=16)
+    regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)
     parameters = {'neurons':(5, 10, 50, 100),
                   'dropoutRate':(0, 0.1, 0.2, 0.3),
                   'constraints':(3, 50, 99)}
@@ -397,7 +400,7 @@ for time_step in (5, 10, 50):
     regressor = create_LSTM(neurons=clf.best_params_.get('neurons'),
                             dropoutRate=clf.best_params_.get('dropoutRate'),
                             constraints=clf.best_params_.get('constraints'))
-    regressor.fit(X_train, y_train, epochs=50, batch_size=16)
+    regressor.fit(X_train, y_train, epochs=50, batch_size=8)
     y_pred_scaled = regressor.predict(X_test)
     sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
     sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
@@ -435,7 +438,9 @@ for train, valid in kfold.split(X_train):
 '''
 
 '''
-To be continued
+To be continued: KFold validation for LSTM
+'''
+
 '''
 try:
     best_neurons = clf.best_params_.get('neurons')
@@ -445,11 +450,17 @@ except:
     best_neurons = 50
     best_dropoutRate = 0.1
     best_constraints = 99
+'''
+
+best_neurons = 50
+best_dropoutRate = 0.1
+best_constraints = 99
+
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=best_constraints)
-#r = regressor.fit(X_train, y_train, epochs=50, batch_size=16)
+#r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
 # Using early stopping to train the model
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, 
                                             min_delta=0, restore_best_weights=True)#change patience number

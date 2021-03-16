@@ -24,8 +24,8 @@ import pandas as pd
 #flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
-flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
+flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
 ###############################################################################
 weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
                       usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
@@ -63,9 +63,22 @@ weather.groupby('Month')['Total Precip (mm)'].mean().plot.bar(title='Average Tot
 weather.groupby('Month')['Snow on Grnd (cm)'].mean().plot.bar(title='Average Snow on Grnd (cm) by Month')
 
 #Flowrate
-flowrate['Year'] = flowrate['Datetime'].dt.year
-flowrate['Month'] = flowrate['Datetime'].dt.month
-flowrate['Day'] = flowrate['Datetime'].dt.day
+flowrate.dropna(inplace=True)
+flowrate['Year'] = flowrate['Datetime'].dt.year.astype('int')
+flowrate['Month'] = flowrate['Datetime'].dt.month.astype('int')
+flowrate['Day'] = flowrate['Datetime'].dt.day.astype('int')
+
+flowrate.groupby('Year')['flow'].mean().plot.bar(title='Average Flow Rate by Year for Station FRO KC1')
+flowrate.groupby('Year')['flow,'].mean().drop(index=[1996,1997,1998,2000,2001,2002,2003,2004]).plot.bar(title='Average Flow Rate by Year for Station FRO HC1')
+flowrate.groupby('Year')['flow,'].mean().plot.bar(title='Average Flow Rate by Year for Station GHO CC1')
+flowrate.groupby('Year')['flow,'].mean().plot.bar(title='Average Flow Rate by Year for Station GHO PC1')
+flowrate.groupby('Year')['flow,'].mean().drop(index=[1992,2000]).plot.bar(title='Average Flow Rate by Year for Station EVO HC1')
+flowrate.groupby('Year')['flow,'].mean().drop(index=[1995,2001]).plot.bar(title='Average Flow Rate by Year for Station GHO SC1')
+flowrate.groupby('Year')['flow'].mean().drop(index=[2001,2002,2003,2005,2006,2007,2008,2009]).plot.bar(title='Average Flow Rate by Year for Station LCO WLC')
+flowrate.groupby('Year')['flow,'].mean().drop(index=[2007,2009]).plot.bar(title='Average Flow Rate by Year for Station LCO LC3')
+flowrate.groupby('Year')['report_result_value'].mean().drop(index=[1992,2004]).plot.bar(title='Average Flow Rate by Year for Station EVO BC1')
+flowrate.groupby('Year')['report_result_value'].mean().drop(index=[1996,2001,2004]).plot.bar(title='Average Flow Rate by Year for Station EVO EC1')
+flowrate.groupby('Year')['report_result_value'].mean().drop(index=[1985,1992,1997,1998,1999,2000,2001,2002,2003]).plot.bar(title='Average Flow Rate by Year for Station EVO SM1')
 
 flowrate.groupby('Month')['report_result_value'].mean().plot.bar(
     title='Average Flow Rate by Month for EVO EC1 Station')
