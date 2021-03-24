@@ -18,11 +18,11 @@ import pandas as pd
 #flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
 #flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
+flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
-flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
 ##flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
@@ -72,60 +72,6 @@ except:
     print('Filled weather data saved successfully')
 
 # =============================================================================
-# Generating melting data
-# =============================================================================
-flowrate_threshold = 1
-melt = np.zeros(len(flowrate['flow']))
-j = 0
-for i in flowrate['flow']:
-    if i > flowrate_threshold:#Spring freshet
-       melt[j]  = 1
-    else:
-        melt[j] = 0
-    j = j + 1
-
-flowrate['melt'] = melt
-
-merge = pd.merge(weather, flowrate, on=('Datetime'), how='left').drop('flow', 1)
-merge = np.array(merge)
-
-day0 = []
-#day_1, day_2 = [], []#for more than 2 days
-for i in range(0, len(merge)):
-    if merge[i][9] == 0 or merge[i][9] == 1:
-        day0.append(merge[i, :])
-        #day_1.append(merge[i-1, 3:8])#start/end columns are to be changed, check by hand
-        #day_2.append(merge[i-2, 3:8])
-day0 = np.array(day0)
-#day_1, day_2 = np.array(day_1), np.array(day_2)#for more than 2 days
-
-# Switch of 1 day, 2 days or 3 days
-X = day0.copy()
-#X = np.c_[day0, day_1]
-#X = np.c_[day0, day_1, day_2]
-
-# Transfer to dataframe and seperate to train, valid and test set
-X = pd.DataFrame(X, index=X[:, 8])
-X.dropna(inplace=True)
-
-X_test = X.loc['2012-01-01':'2012-12-31'].values
-X = X.loc['1990-01-01':'2012-01-01'].values#Changed
-datetime = X[:, 8]
-y = X[:, 9]
-X = X[:, 1:8]
-#X = np.c_[X[:, 1:8], X[:, 10:]]#for more than 2 days
-#eliminate 'year' from the inputX = X[:, 1:8] 
-
-# =============================================================================
-# Transforming test set
-# =============================================================================
-datetime_test = X_test[:, 8]
-y_test = X_test[:, 9]
-X_test = X_test[:, 1:8]
-#X_test = np.c_[X_test[:, 1:8], X_test[:, 10:]]#for more than 2 days
-#X = X[:, 1:8] eliminate 'year' from the input
-
-# =============================================================================
 # Defining functions
 # =============================================================================
 def predict_test(X_scaled_test, classifier):
@@ -152,153 +98,20 @@ def rootMSE(y_test, y_pred):
     return rmse
 
 # =============================================================================
-# Decision Tree
-# =============================================================================
-# Fixing a seed
-seed = 1029
-np.random.seed(seed)
-try:
-    from joblib import load
-    classifier = load('DecisionTreeForLSTM_LCO_LC3.joblib')
-    print('Trained decision tree result loaded successfully')
-except:
-    print('No training result detected, training...')
-    from sklearn.tree import DecisionTreeClassifier
-    classifier = DecisionTreeClassifier()# Use 'entropy' instead of 'gini'
-    
-    # Grid searching
-    from sklearn.model_selection import GridSearchCV
-    parameters = {'criterion':('gini', 'entropy'),
-                  'min_weight_fraction_leaf':(0.1, 0.01)}
-    clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
-    clf.fit(X, y.astype('int'))
-    print('Best score:', clf.best_score_)
-    print('Best parameters:', clf.best_params_)
-    
-    # Training the classifier with best hyperparameters
-    classifier = DecisionTreeClassifier(criterion=clf.best_params_.get('criterion'),
-                                        min_weight_fraction_leaf=clf.best_params_.get('min_weight_fraction_leaf'),
-                                        random_state=seed)
-    classifier.fit(X, y.astype('int'))
-    
-    from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_LCO_LC3.joblib')#To be changed
-    print('Decision tree training result saved')
-
-# Prediction
-print('For DecisionTreeClassifier: ')
-y_pred = predict_test(X_test, classifier)
-accuracy = accuracy_print_conf(y_test, y_pred)
-
-#Indicator calculating
-from sklearn.metrics import roc_auc_score, classification_report
-dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
-print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
-print(classification_report(np.int32(y_test), y_pred))
-#springFS_pred_test = y_pred.copy()
-'''
-# =============================================================================
-# Visualization of the tree
-# =============================================================================
-from sklearn.tree import export_graphviz
-from IPython.display import Image
-from six import StringIO
-import pydotplus
-# Need to install GraphViz and pydotplus
-feature_names = pd.DataFrame(weather.columns[1:-1])#eliminate 'year' feature name
-#feature_names = feature_names.append(pd.DataFrame(weather.columns[3:-1]))#for more than 1 day
-feature_names = np.array(feature_names).tolist()
-# 文件缓存
-dot_data = StringIO()
-# 将决策树导入到dot中
-export_graphviz(classifier, out_file=dot_data,  
-                filled=True, rounded=True,
-                special_characters=True,
-                feature_names = feature_names,
-                class_names=['NotSF','SF'])
-# 将生成的dot文件生成graph
-graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-# 将结果存入到png文件中
-graph.write_png('Visualization\Decision_tree_evaluation\Decision_tree_LCO_LC3.png')
-# 显示
-Image(graph.create_png())
-'''
-# =============================================================================
 # LSTM
 # =============================================================================
 flowrate.index = range(0, len(flowrate))
 merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge = np.array(merge)
-merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
-'''
-# =============================================================================
-# EDA
-# =============================================================================
-feature_names = pd.DataFrame(weather.columns[:-1])
-feature_names = np.array(feature_names)
-feature_names = np.append(feature_names,'Flowrate\n(m^3/s)')
-
-#Correlation analysis
-import seaborn as sns
-corr = merge.drop(8,1).drop(9,1).apply(lambda x:x.astype(float)).corr()
-sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names)
-
-#Features importance analysis of decision tree
-feature_names = feature_names[1:-1]
-importances = classifier.feature_importances_#get importance
-indices = np.argsort(importances)[::-1]#get the order of features
-plt.figure(figsize=(12,6))
-plt.title("Feature importance by Decision Tree of LCO LC3 Station")
-plt.bar(range(len(indices)), importances[indices], color='lightblue',  align="center")
-plt.step(range(len(indices)), np.cumsum(importances[indices]), where='mid', label='Cumulative')
-plt.xticks(range(len(indices)), feature_names[indices], rotation='vertical',fontsize=14)
-plt.xlim([-1, len(indices)])
-plt.show()
-
-#ROC plot
-from sklearn.metrics import roc_curve
-dt_fpr, dt_tpr, dt_thresholds = roc_curve(np.int32(y_test), classifier.predict_proba(X_test)[:,1])
-plt.figure()
-plt.plot(dt_fpr, dt_tpr, label='Decision Tree (area = %0.2f)' % dt_roc_auc, marker='o')
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.plot([0, 1], [0, 1], 'r--')
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('ROC Graph of LCO LC3 Station')
-plt.legend(loc="lower right")
-plt.show()
-'''
-'''
-sklearn.metrics.roc_curve(y_true, y_score, *, pos_label=None, sample_weight=None, drop_intermediate=True)
-y_scorendarray of shape (n_samples,)
-Target scores, can either be probability estimates of the positive class, confidence values, or non-thresholded measure of decisions (as returned by “decision_function” on some classifiers).
-thresholdsndarray of shape = (n_thresholds,)
-Decreasing thresholds on the decision function used to compute fpr and tpr. thresholds[0] represents no instances being predicted and is arbitrarily set to max(y_score) + 1.
-'''
 
 # =============================================================================
 # LSTM continue
 # =============================================================================
-test = merge.loc['2012-12-04':'2013-12-31'].drop(8,1).values
+test = merge.loc['2013-01-01':'2013-12-31'].drop(8,1).values#Test must be the LAST year of the dataset
 #valid = merge.loc['2012-01-01':'2012-12-31'].drop(8,1).values
-train = merge.loc['1990-01-01':'2012-12-04'].drop(8,1).values#Changed
+train = merge.loc['1990-01-01':'2013-01-01'].drop(8,1).values#Changed
 
-# Building X for decision tree
-X_DT = np.array(train[:,1:8])#eliminate 'year' feature
-X_test_DT = np.array(test[:,1:8])#eliminate 'year' feature
-#X_DT = np.c_[train[1:,1:8], train[:-1, 3:8]]#for more than one days
-#X_test_DT = np.c_[test[1:,1:8], test[:-1, 3:8]]#for more than one days
-
-# Predicting spring F.S. by the decision tree classifier
-melt_train = classifier.predict(X_DT)
-melt_test = classifier.predict(X_test_DT)
-
-train[:, 8] = melt_train
-test[:, 8] = melt_test
-#train[1:, 8] = melt_train
-#test[1:, 8] = melt_test
 train = np.array(train[:, :])
 test = np.array(test[:, :])
 #train = np.array(train[1:, :])
@@ -360,11 +173,12 @@ To be continued: Defining training parameters:
     epochs_max, batch_size, patience, validation_ratio, cv_num
 '''
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.model_selection import GridSearchCV
 for time_step in (5, 10, 50):
     print('Below are results for time_step:', time_step)
     X_train, y_train, y_train_not_scaled = [], [], []
     for i in range(time_step, len(train)):
-        if scaled_train[i][19]>=0:
+        if scaled_train[i][18]>=0:
             X_train.append(scaled_train[i- time_step:i, :-1])
             y_train.append(scaled_train[i, -1])
             y_train_not_scaled.append(train[i, -1])
@@ -373,7 +187,7 @@ for time_step in (5, 10, 50):
     
     X_test, y_test, y_test_not_scaled = [], [], []
     for i in range(time_step, len(test)):
-        if scaled_test[i][19]>=0:
+        if scaled_test[i][18]>=0:
             X_test.append(scaled_test[i- time_step:i, :-1])
             y_test.append(scaled_test[i, -1])
             y_test_not_scaled.append(test[i, -1])
@@ -412,11 +226,11 @@ for time_step in (5, 10, 50):
 # =============================================================================
 # New LSTM
 # =============================================================================
-time_step = 50
+time_step = 5
 print('Below are results for time_step:', time_step)
 X_train, y_train, y_train_not_scaled = [], [], []
 for i in range(time_step, len(train)):
-    if scaled_train[i][19]>=0:
+    if scaled_train[i][18]>=0:
         X_train.append(scaled_train[i- time_step:i, :-1])
         y_train.append(scaled_train[i, -1])
         y_train_not_scaled.append(train[i, -1])
@@ -425,7 +239,7 @@ X_train, y_train = np.array(X_train), np.array(y_train)
     
 X_test, y_test, y_test_not_scaled = [], [], []
 for i in range(time_step, len(test)):
-    if scaled_test[i][19]>=0:
+    if scaled_test[i][18]>=0:
         X_test.append(scaled_test[i- time_step:i, :-1])
         y_test.append(scaled_test[i, -1])
         y_test_not_scaled.append(test[i, -1])
@@ -452,7 +266,7 @@ except:
     best_constraints = 99
 '''
 
-best_neurons = 50
+best_neurons = 5
 best_dropoutRate = 0.1
 best_constraints = 99
 
@@ -462,9 +276,9 @@ regressor = create_LSTM(neurons=best_neurons,
                         constraints=best_constraints)
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
 # Using early stopping to train the model
-early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, 
+early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, 
                                             min_delta=0, restore_best_weights=True)#change patience number
-r = regressor.fit(X_train, y_train, epochs=50, batch_size=8, 
+r = regressor.fit(X_train, y_train, epochs=500, batch_size=16, 
               callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
 #Stopped val_loss=0.0036
 #接住这个返回值可以画出loss曲线，用尽量大的epoch画图，看是否只是fluctuation
@@ -475,7 +289,7 @@ plt.legend()
 plt.show()
 
 if early_stop_callback.stopped_epoch == 0:
-    early_epoch = 50
+    early_epoch = 500
 else:
     early_epoch = early_stop_callback.stopped_epoch
     
@@ -484,7 +298,7 @@ print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=best_constraints)
-r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=8)
+r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=16)
 plt.plot(r.history['loss'], label='loss')
 plt.legend()
 plt.show()
@@ -497,7 +311,7 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
-np.savetxt('FRO_KC1_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
+np.savetxt('GHO_PC1_Test_Data_withoutSF.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
 
 # =============================================================================
 # Saving the training results
@@ -514,19 +328,17 @@ weather_2013 = np.array(weather_2013)
 
 X_test_DT = weather_2013[:,1:]
 
-melt_test = classifier.predict(X_test_DT)
-
 ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
 X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
 X_test = ct.fit_transform(X_test_DT)
 X_month = X_test[:, :11]
-X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,2: ], melt_test[1:]]
+X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,2: ]]
 
 test = np.c_[X_test, np.zeros(len(X_test))]
 scaled_test = scaler.transform(test)
 scaled_test = scaled_test[:, :-1]
 
-time_step = 50
+time_step = 5
 print('Below are results for time_step:', time_step)
 X_test = []
 for i in range(time_step, len(scaled_test)):
@@ -540,4 +352,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('temp_pred_whole_2013.csv',y_pred,fmt='%f',delimiter=',')
+np.savetxt('temp_pred_whole_2013_withoutSF.csv',y_pred,fmt='%f',delimiter=',')
