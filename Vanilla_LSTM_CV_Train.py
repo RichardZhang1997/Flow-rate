@@ -15,10 +15,10 @@ import pandas as pd
 
 ###############################################################################
 # Loading datasets
-#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
 #flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
@@ -108,9 +108,9 @@ merge = pd.DataFrame(merge, index=merge[:, 8])
 # =============================================================================
 # LSTM continue
 # =============================================================================
-test = merge.loc['2013-01-01':'2013-12-31'].drop(8,1).values#Test must be the LAST year of the dataset
+test = merge.loc['2013-01-01':'2013-12-31'].drop(8,1).drop(2,1).values#Test must be the LAST year of the dataset
 #valid = merge.loc['2012-01-01':'2012-12-31'].drop(8,1).values
-train = merge.loc['1990-01-01':'2013-01-01'].drop(8,1).values#Changed
+train = merge.loc['1990-01-01':'2013-01-01'].drop(8,1).drop(2,1).values#Changed
 
 train = np.array(train[:, :])
 test = np.array(test[:, :])
@@ -124,7 +124,7 @@ from sklearn.preprocessing import OneHotEncoder
 ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
 train = ct.fit_transform(train)
 test = ct.transform(test)
-train = np.c_[train[:, :11], train[:, 12:]]
+train = np.c_[train[:, :11], train[:, 12:]]#Delete the last column as a dummy variable
 test = np.c_[test[:, :11], test[:, 12:]]
 
 from sklearn.preprocessing import MinMaxScaler
@@ -133,12 +133,12 @@ scaled_train = scaler.fit_transform(train)
 scaled_test = scaler.transform(test)
 
 # Constructing a LSTM
-from keras.models import Sequential
-from keras.layers import Dense, LSTM
-from keras.constraints import max_norm
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, LSTM
+from tensorflow.keras.constraints import max_norm
 import tensorflow as tf
 
-opt = tf.keras.optimizers.Adam(learning_rate=0.0001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CVTraining 确定
+opt = tf.keras.optimizers.Adam(learning_rate=0.00001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CVTraining 确定
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
@@ -170,16 +170,19 @@ def create_LSTM(neurons, dropoutRate, constraints):
     return regressor
 '''
 To be continued: Defining training parameters: 
-    epochs_max, batch_size, patience, validation_ratio, cv_num
+    validation_ratio, cv_num
 '''
+#Defining training parameters
+gap_days = 0 #No. of days between the last day of input and the predict date
+
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 from sklearn.model_selection import GridSearchCV
 for time_step in (5, 10, 50):
     print('Below are results for time_step:', time_step)
     X_train, y_train, y_train_not_scaled = [], [], []
     for i in range(time_step, len(train)):
-        if scaled_train[i][18]>=0:
-            X_train.append(scaled_train[i- time_step:i, :-1])
+        if scaled_train[i][17]>=0:
+            X_train.append(scaled_train[i- time_step+1-gap_days:i+1-gap_days, :-1])
             y_train.append(scaled_train[i, -1])
             y_train_not_scaled.append(train[i, -1])
     X_train, y_train = np.array(X_train), np.array(y_train)
@@ -187,14 +190,14 @@ for time_step in (5, 10, 50):
     
     X_test, y_test, y_test_not_scaled = [], [], []
     for i in range(time_step, len(test)):
-        if scaled_test[i][18]>=0:
-            X_test.append(scaled_test[i- time_step:i, :-1])
+        if scaled_test[i][17]>=0:
+            X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :-1])
             y_test.append(scaled_test[i, -1])
             y_test_not_scaled.append(test[i, -1])
     X_test, y_test = np.array(X_test), np.array(y_test)
     
     # Creating the model
-    regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)
+    regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)#Default CV parameters, not that accurate
     parameters = {'neurons':(5, 10, 50, 100),
                   'dropoutRate':(0, 0.1, 0.2, 0.3),
                   'constraints':(3, 50, 99)}
@@ -226,12 +229,12 @@ for time_step in (5, 10, 50):
 # =============================================================================
 # New LSTM
 # =============================================================================
-time_step = 5
+time_step = 10
 print('Below are results for time_step:', time_step)
 X_train, y_train, y_train_not_scaled = [], [], []
 for i in range(time_step, len(train)):
-    if scaled_train[i][18]>=0:
-        X_train.append(scaled_train[i- time_step:i, :-1])
+    if scaled_train[i][17]>=0:
+        X_train.append(scaled_train[i- time_step+1-gap_days:i+1-gap_days, :-1])
         y_train.append(scaled_train[i, -1])
         y_train_not_scaled.append(train[i, -1])
 X_train, y_train = np.array(X_train), np.array(y_train)
@@ -239,8 +242,8 @@ X_train, y_train = np.array(X_train), np.array(y_train)
     
 X_test, y_test, y_test_not_scaled = [], [], []
 for i in range(time_step, len(test)):
-    if scaled_test[i][18]>=0:
-        X_test.append(scaled_test[i- time_step:i, :-1])
+    if scaled_test[i][17]>=0:
+        X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :-1])
         y_test.append(scaled_test[i, -1])
         y_test_not_scaled.append(test[i, -1])
 X_test, y_test = np.array(X_test), np.array(y_test)
@@ -266,9 +269,13 @@ except:
     best_constraints = 99
 '''
 
-best_neurons = 5
+best_neurons = 50
 best_dropoutRate = 0.1
-best_constraints = 99
+best_constraints = 3
+
+epochs_max = 500
+batch_size = 4
+patience = 3
 
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
@@ -276,12 +283,11 @@ regressor = create_LSTM(neurons=best_neurons,
                         constraints=best_constraints)
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
 # Using early stopping to train the model
-early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, 
+early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, 
                                             min_delta=0, restore_best_weights=True)#change patience number
-r = regressor.fit(X_train, y_train, epochs=500, batch_size=16, 
+r = regressor.fit(X_train, y_train, epochs=epochs_max, batch_size=batch_size, 
               callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
-#Stopped val_loss=0.0036
-#接住这个返回值可以画出loss曲线，用尽量大的epoch画图，看是否只是fluctuation
+
 # Plot loss per iteration
 plt.plot(r.history['loss'], label='loss')
 plt.plot(r.history['val_loss'], label='val_loss')
@@ -289,7 +295,7 @@ plt.legend()
 plt.show()
 
 if early_stop_callback.stopped_epoch == 0:
-    early_epoch = 500
+    early_epoch = epochs_max
 else:
     early_epoch = early_stop_callback.stopped_epoch
     
@@ -298,7 +304,7 @@ print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=best_constraints)
-r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=16)
+r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size)
 plt.plot(r.history['loss'], label='loss')
 plt.legend()
 plt.show()
@@ -311,7 +317,7 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
-np.savetxt('GHO_PC1_Test_Data_withoutSF.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
+np.savetxt('FRO_KC1_Test_Data_withoutSF_1.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
 
 # =============================================================================
 # Saving the training results
@@ -332,17 +338,17 @@ ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remaind
 X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
 X_test = ct.fit_transform(X_test_DT)
 X_month = X_test[:, :11]
-X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,2: ]]
+X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,3: ]]
 
 test = np.c_[X_test, np.zeros(len(X_test))]
 scaled_test = scaler.transform(test)
 scaled_test = scaled_test[:, :-1]
 
-time_step = 5
+time_step = 10
 print('Below are results for time_step:', time_step)
 X_test = []
 for i in range(time_step, len(scaled_test)):
-    X_test.append(scaled_test[i- time_step:i, :])
+    X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :])
 
 X_test = np.array(X_test)
 
@@ -352,4 +358,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('temp_pred_whole_2013_withoutSF.csv',y_pred,fmt='%f',delimiter=',')
+np.savetxt('temp_pred_whole_2013_withoutSF_FRO_KC1.csv',y_pred,fmt='%f',delimiter=',')
