@@ -106,23 +106,26 @@ X = day0.copy()
 
 # Transfer to dataframe and seperate to train, valid and test set
 X = pd.DataFrame(X, index=X[:, 8])
+X = X.drop(2,1)
 X.dropna(inplace=True)
 
 X_test = X.loc['2013-01-01':'2013-12-31'].values
 X = X.loc['1990-01-01':'2013-01-01'].values#Changed
-datetime = X[:, 8]
-y = X[:, 9]
-X = X[:, 1:8]
-#X = np.c_[X[:, 1:8], X[:, 10:]]#for more than 2 days
+datetime = X[:, 7]
+y = X[:, 8]
+
+X = X[:, 1:7]
+#X = np.c_[X[:, 1:7], X[:, 9:]]#for more than 2 days
 #eliminate 'year' from the inputX = X[:, 1:8] 
 
 # =============================================================================
 # Transforming test set
 # =============================================================================
-datetime_test = X_test[:, 8]
-y_test = X_test[:, 9]
-X_test = X_test[:, 1:8]
-#X_test = np.c_[X_test[:, 1:8], X_test[:, 10:]]#for more than 2 days
+datetime_test = X_test[:, 7]
+y_test = X_test[:, 8]
+
+X_test = X_test[:, 1:7]
+#X_test = np.c_[X_test[:, 1:7], X_test[:, 9:]]#for more than 2 days
 #X = X[:, 1:8] eliminate 'year' from the input
 
 # =============================================================================
@@ -223,6 +226,7 @@ graph.write_png('Visualization\Decision_tree_evaluation\Decision_tree_LCO_LC3.pn
 # 显示
 Image(graph.create_png())
 '''
+
 # =============================================================================
 # LSTM
 # =============================================================================
@@ -231,6 +235,7 @@ merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge = np.array(merge)
 merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
+
 '''
 # =============================================================================
 # EDA
@@ -286,17 +291,17 @@ test = merge.loc['2012-12-04':'2013-12-31'].drop(8,1).drop(2,1).values
 train = merge.loc['1990-01-01':'2012-12-04'].drop(8,1).drop(2,1).values#Changed
 
 # Building X for decision tree
-X_DT = np.array(train[:,1:8])#eliminate 'year' feature
-X_test_DT = np.array(test[:,1:8])#eliminate 'year' feature
-#X_DT = np.c_[train[1:,1:8], train[:-1, 3:8]]#for more than one days
-#X_test_DT = np.c_[test[1:,1:8], test[:-1, 3:8]]#for more than one days
+X_DT = np.array(train[:,1:7])#eliminate 'year', 'day' features
+X_test_DT = np.array(test[:,1:7])#eliminate 'year', day' features
+#X_DT = np.c_[train[1:,1:7], train[:-1, 2:7]]#for more than one days
+#X_test_DT = np.c_[test[1:,1:7], test[:-1, 2:7]]#for more than one days
 
 # Predicting spring F.S. by the decision tree classifier
 melt_train = classifier.predict(X_DT)
 melt_test = classifier.predict(X_test_DT)
 
-train[:, 8] = melt_train
-test[:, 8] = melt_test
+train[:, 7] = melt_train
+test[:, 7] = melt_test
 #train[1:, 8] = melt_train
 #test[1:, 8] = melt_test
 train = np.array(train[:, :])
@@ -325,7 +330,11 @@ from tensorflow.keras.layers import Dense, LSTM
 from tensorflow.keras.constraints import max_norm
 import tensorflow as tf
 
-opt = tf.keras.optimizers.Adam(learning_rate=0.0001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CVTraining 确定
+#print(tf.__version__)
+#tf.keras.backend.clear_session()
+#tf.random.set_seed(seed)
+
+opt = tf.keras.optimizers.Adam(learning_rate=0.0001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
@@ -518,8 +527,7 @@ regressor.save_weights('./FRO_KC1_')
 weather_2013 = pd.read_csv('Weather_filled2013.csv').drop('Num', 1).drop('Datetime', 1)
 weather_2013 = np.array(weather_2013)
 
-X_test_DT = weather_2013[:,1:]
-
+X_test_DT = np.c_[weather_2013[:,1:2], weather_2013[:,3:]]
 melt_test = classifier.predict(X_test_DT)
 
 ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
