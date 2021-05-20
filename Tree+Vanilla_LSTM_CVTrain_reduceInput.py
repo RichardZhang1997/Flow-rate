@@ -15,7 +15,8 @@ import pandas as pd
 
 ###############################################################################
 # Loading datasets
-flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
@@ -34,23 +35,29 @@ flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d'
 flowrate = flowrate.drop('sample_date', 1)
 
 #print(flowrate.describe())
+avg_days = 7# Switch avg_days in [1, 3, 7, 15]
+'''
+weather = pd.read_csv('Weather_filled_avg_' + avg_days + '.csv')
+weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
 
+'''
 # =============================================================================
-# Missing weather data filling
+# Missing weather data filling (average weather input enabled)
 # =============================================================================
 try:
-    weather = pd.read_csv('Weather_filled.csv').drop('Num', 1)
+    weather = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
     weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
     print('Filled weather data loaded successfully')
 except:
     print('Filled weather data not detected, generating...')
-    weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
-                      usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+    #weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
+    #                  usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+    weather = pd.read_csv('weather_1990-2013_avg_1.csv')
     weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
     weather = weather.drop('Date/Time', 1)
     print(weather.describe())
     monthly_mean = pd.DataFrame()
-    monthly_mean['Mean Temp (°C)_1'] = weather.groupby('Month')['Mean Temp (°C)'].mean()
+    monthly_mean['Mean Temp (C)_1'] = weather.groupby('Month')['Mean Temp (C)'].mean()
     monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
     monthly_mean['Total Snow (cm)_1'] = weather.groupby('Month')['Total Snow (cm)'].mean()
     monthly_mean['Total Precip (mm)_1'] = weather.groupby('Month')['Total Precip (mm)'].mean()
@@ -61,14 +68,14 @@ except:
     monthly_mean.index = range(1, 13)#for 12 months, the name of index must be removed
     weather_copy = pd.merge(weather, monthly_mean, on=('Month'), how='left')
 
-    for i in ['Mean Temp (°C)', 'Total Rain (mm)', 'Total Snow (cm)', 'Total Precip (mm)', 'Snow on Grnd (cm)']:
+    for i in ['Mean Temp (C)', 'Total Rain (mm)', 'Total Snow (cm)', 'Total Precip (mm)', 'Snow on Grnd (cm)']:
         for j in range(0, len(weather_copy)):
             if weather_copy[i].isnull()[j]:
                 weather_copy.loc[j, i] = weather_copy[i+'_1'][j]
-    weather = weather_copy.drop(columns=['Mean Temp (°C)_1', 'Total Rain (mm)_1', 
+    weather = weather_copy.drop(columns=['Mean Temp (C)_1', 'Total Rain (mm)_1', 
                                          'Total Snow (cm)_1', 'Total Precip (mm)_1',
                                          'Snow on Grnd (cm)_1'])
-    pd.DataFrame(weather).to_csv('Weather_filled.csv')
+    pd.DataFrame(weather).to_csv('Weather_filled_avg_1.csv')
     print('Filled weather data saved successfully')
 
 # =============================================================================
@@ -141,14 +148,14 @@ def accuracy_print_conf(y_test, y_pred):
     conf_matrix = confusion_matrix(y_test.astype('int'), y_pred.astype('int'))
     print('The confusion matrix is:\n', conf_matrix)
     accuracy = accuracy_score(y_test.astype('int'), y_pred.astype('int'))
-    print('The accuracy is:', accuracy)
+    print('The accuracy is: %2.2f' % accuracy)
     return accuracy
 
 def rootMSE(y_test, y_pred):
     import math
     from sklearn.metrics import mean_squared_error
     rmse = math.sqrt(mean_squared_error(y_test, y_pred))
-    print('RMSE =', rmse)
+    print('RMSE = %2.2f' % rmse)
     print('Predicted results length:', y_pred.shape)
     y_test = np.array(y_test).reshape(-1, 1)
     print('Real results length:', y_test.shape)
@@ -160,6 +167,7 @@ def rootMSE(y_test, y_pred):
 # Fixing a seed
 seed = 1029
 np.random.seed(seed)
+from sklearn.model_selection import GridSearchCV
 try:
     from joblib import load
     classifier = load('DecisionTreeForLSTM_FRO_KC1.joblib')
@@ -170,7 +178,6 @@ except:
     classifier = DecisionTreeClassifier()# Use 'entropy' instead of 'gini'
     
     # Grid searching
-    from sklearn.model_selection import GridSearchCV
     parameters = {'criterion':('gini', 'entropy'),
                   'min_weight_fraction_leaf':(0.1, 0.01)}
     clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
@@ -299,16 +306,42 @@ X_test_DT = np.array(test[:,1:7])#eliminate 'year', day' features
 # Predicting spring F.S. by the decision tree classifier
 melt_train = classifier.predict(X_DT)
 melt_test = classifier.predict(X_test_DT)
+'''
+##############################################################################
+# Load averaged weather data (No need to input averaged data to DT)
+weather = pd.read_csv('weather_1990-2013_avg_7.csv')
+weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
+print('Filled and averaged weather data loaded successfully')
 
+flowrate.index = range(0, len(flowrate))
+merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
+merge = np.array(merge)
+merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
+merge = pd.DataFrame(merge, index=merge[:, 8])
+
+test = merge.loc['2012-12-04':'2013-12-31'].drop(8,1).drop(2,1).values
+#valid = merge.loc['2012-01-01':'2012-12-31'].drop(8,1).values
+train = merge.loc['1990-01-01':'2012-12-04'].drop(8,1).drop(2,1).values#Changed
+##############################################################################
+'''
 train[:, 7] = melt_train
 test[:, 7] = melt_test
 #train[1:, 8] = melt_train
 #test[1:, 8] = melt_test
+
 train = np.array(train[:, :])
 test = np.array(test[:, :])
 #train = np.array(train[1:, :])
 #test = np.array(test[1:, :])
 
+#year, temp, precip, SF
+#train = np.c_[train[:, 0], train[:, 2], train[:, 5], train[:, 7:]]
+#test = np.c_[test[:, 0], test[:, 2], test[:, 5], test[:, 7:]]
+
+#year, 5 weather, SF
+train = np.c_[train[:, 0], train[:, 2:]]
+test = np.c_[test[:, 0], test[:, 2:]]
+'''
 # One_Hot Encoding
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
@@ -318,6 +351,7 @@ train = ct.fit_transform(train)
 test = ct.transform(test)
 train = np.c_[train[:, :11], train[:, 12:]]#Delete the last column as a dummy variable
 test = np.c_[test[:, :11], test[:, 12:]]
+'''
 
 from sklearn.preprocessing import MinMaxScaler
 scaler = MinMaxScaler(feature_range=(0, 1), copy=True)
@@ -331,10 +365,10 @@ from tensorflow.keras.constraints import max_norm
 import tensorflow as tf
 
 #print(tf.__version__)
-#tf.keras.backend.clear_session()
-#tf.random.set_seed(seed)
+tf.keras.backend.clear_session()
+tf.random.set_seed(seed)
 
-opt = tf.keras.optimizers.Adam(learning_rate=0.0001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
+opt = tf.keras.optimizers.Adam(learning_rate=0.00001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
@@ -354,30 +388,31 @@ def create_LSTM(neurons, dropoutRate, constraints):
                        bias_constraint=max_norm(constraints)))
     '''
     # Adding the last LSTM layer and some Dropout regulariazation
-    regressor.add(LSTM(units=neurons, return_sequences=False, recurrent_dropout=dropoutRate, 
+    regressor.add(LSTM(units=neurons, return_sequences=False, recurrent_dropout=dropoutRate,
                        kernel_constraint=max_norm(constraints), recurrent_constraint=max_norm(constraints), 
                        bias_constraint=max_norm(constraints)))
 
     # Adding output layer
-    regressor.add(Dense(units=1))# Output layer do not need specify the activation function
+    regressor.add(Dense(units=1, kernel_initializer='random_normal', activation='relu'))# Output layer do not need specify the activation function
     
     # Compiling the RNN by usign right optimizer and right loss function
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
-'''
-To be continued: Defining training parameters: 
-    validation_ratio, cv_num
-'''
+
 #Defining training parameters
 gap_days = 0 #No. of days between the last day of input and the predict date
 
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
-for time_step in (5, 10, 50):
+for time_step in (3, 7, 15, 30):
     print('Below are results for time_step:', time_step)
     X_train, y_train, y_train_not_scaled = [], [], []
     for i in range(time_step, len(train)):
-        if scaled_train[i][18]>=0:
-            X_train.append(scaled_train[i- time_step+1-gap_days:i+1-gap_days, :-1])
+        if scaled_train[i][-1]>=0:
+            #X_train.append(scaled_train[i-time_step+1-gap_days:i+1-gap_days, :-1])
+            sample_input = []
+            for j in range(0, time_step):
+                sample_input.append(scaled_train[i-gap_days-(time_step-1-j)*avg_days, :-1])
+            X_train.append(sample_input)
             y_train.append(scaled_train[i, -1])
             y_train_not_scaled.append(train[i, -1])
     X_train, y_train = np.array(X_train), np.array(y_train)
@@ -385,17 +420,21 @@ for time_step in (5, 10, 50):
     
     X_test, y_test, y_test_not_scaled = [], [], []
     for i in range(time_step, len(test)):
-        if scaled_test[i][18]>=0:
-            X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :-1])
+        if scaled_test[i][-1]>=0:
+            #X_test.append(scaled_test[i-time_step+1-gap_days:i+1-gap_days, :-1])
+            sample_input = []
+            for j in range(0, time_step):
+                sample_input.append(scaled_test[i-gap_days-(time_step-1-j)*avg_days, :-1])
+            X_test.append(sample_input)
             y_test.append(scaled_test[i, -1])
             y_test_not_scaled.append(test[i, -1])
     X_test, y_test = np.array(X_test), np.array(y_test)
     
     # Creating the model
     regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)#Default CV parameters, not that accurate
-    parameters = {'neurons':(5, 10, 50, 100),
+    parameters = {'neurons':(5, 50, 100),
                   'dropoutRate':(0, 0.1, 0.2, 0.3),
-                  'constraints':(3, 50, 99)}
+                  'constraints':(3, 99)}
     
     clf = GridSearchCV(regressor, parameters, n_jobs=-1, cv=5)
     clf.fit(X_train, y_train)
@@ -424,12 +463,16 @@ for time_step in (5, 10, 50):
 # =============================================================================
 # New LSTM
 # =============================================================================
-time_step = 50
+time_step = 30
 print('Below are results for time_step:', time_step)
 X_train, y_train, y_train_not_scaled = [], [], []
 for i in range(time_step, len(train)):
-    if scaled_train[i][18]>=0:
-        X_train.append(scaled_train[i- time_step+1-gap_days:i+1-gap_days, :-1])
+    if scaled_train[i][-1]>=0:
+        #X_train.append(scaled_train[i-time_step+1-gap_days:i+1-gap_days, :-1])
+        sample_input = []
+        for j in range(0, time_step):
+            sample_input.append(scaled_train[i-gap_days-(time_step-1-j)*avg_days, :-1])
+        X_train.append(sample_input)
         y_train.append(scaled_train[i, -1])
         y_train_not_scaled.append(train[i, -1])
 X_train, y_train = np.array(X_train), np.array(y_train)
@@ -437,11 +480,16 @@ X_train, y_train = np.array(X_train), np.array(y_train)
     
 X_test, y_test, y_test_not_scaled = [], [], []
 for i in range(time_step, len(test)):
-    if scaled_test[i][18]>=0:
-        X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :-1])
+    if scaled_test[i][-1]>=0:
+        #X_test.append(scaled_test[i-time_step+1-gap_days:i+1-gap_days, :-1])
+        sample_input = []
+        for j in range(0, time_step):
+            sample_input.append(scaled_test[i-gap_days-(time_step-1-j)*avg_days, :-1])
+        X_test.append(sample_input)
         y_test.append(scaled_test[i, -1])
         y_test_not_scaled.append(test[i, -1])
 X_test, y_test = np.array(X_test), np.array(y_test)
+
 '''
 from sklearn.model_selection import KFold
 kfold = KFold(5, shuffle=True, random_state=seed)
@@ -464,25 +512,25 @@ except:
     best_constraints = 99
 '''
 
-best_neurons = 50
+best_neurons = 100
 best_dropoutRate = 0.1
-best_constraints = 99
+constraints = 3
 
-epochs_max = 50
-batch_size = 8
-patience = 5
+epochs_max = 500
+batch_size = 4
+patience = 3
 
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
-                        constraints=best_constraints)
+                        constraints=constraints)
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
 # Using early stopping to train the model
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, 
                                             min_delta=0, restore_best_weights=True)#change patience number
 r = regressor.fit(X_train, y_train, epochs=epochs_max, batch_size=batch_size, 
               callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
-
+regressor.summary()
 # Plot loss per iteration
 plt.plot(r.history['loss'], label='loss')
 plt.plot(r.history['val_loss'], label='val_loss')
@@ -493,12 +541,13 @@ if early_stop_callback.stopped_epoch == 0:
     early_epoch = epochs_max
 else:
     early_epoch = early_stop_callback.stopped_epoch
-    
+#early_epoch = 100
+
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
-                        constraints=best_constraints)
+                        constraints=constraints)
 r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size)
 plt.plot(r.history['loss'], label='loss')
 plt.legend()
@@ -524,27 +573,29 @@ regressor.save_weights('./FRO_KC1_')
 # =============================================================================
 # Predicting on 2013 everyday weather data
 # =============================================================================
-weather_2013 = pd.read_csv('Weather_filled2013.csv').drop('Num', 1).drop('Datetime', 1)
+weather_2013 = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
 weather_2013 = np.array(weather_2013)
 
 X_test_DT = np.c_[weather_2013[:,1:2], weather_2013[:,3:]]
 melt_test = classifier.predict(X_test_DT)
 
-ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [1])], remainder='passthrough')
 X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
-X_test = ct.fit_transform(X_test_DT)
-X_month = X_test[:, :11]
-X_test = np.c_[X_month, weather_2013[1:, 0], weather_2013[1:,3: ], melt_test[1:]]
+X_test = np.c_[weather_2013[1:, 0], weather_2013[1:,3: ], melt_test[1:]]
+#X_test = np.c_[X_test[:, 0:2], X_test[:, 4], X_test[:, 6:]]
 
 test = np.c_[X_test, np.zeros(len(X_test))]
 scaled_test = scaler.transform(test)
 scaled_test = scaled_test[:, :-1]
 
-time_step = 50
+#time_step = 10
 print('Below are results for time_step:', time_step)
 X_test = []
 for i in range(time_step, len(scaled_test)):
-    X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :])
+    #X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :])
+    sample_input = []
+    for j in range(0, time_step):
+        sample_input.append(scaled_test[i-gap_days-(time_step-1-j)*avg_days, :])
+    X_test.append(sample_input)
 
 X_test = np.array(X_test)
 
@@ -554,4 +605,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('temp_pred_whole_2013.csv',y_pred,fmt='%f',delimiter=',')
+np.savetxt('pred_whole_1990-2013_FRO_KC1_Short_Input.csv',y_pred,fmt='%f',delimiter=',')
