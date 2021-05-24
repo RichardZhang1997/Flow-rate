@@ -16,7 +16,7 @@ import pandas as pd
 ###############################################################################
 # Loading datasets
 #flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
-flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
+flowrate = pd.read_csv('scaled_train.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
@@ -36,7 +36,7 @@ flowrate = flowrate.drop('sample_date', 1)
 
 #print(flowrate.describe())
 # Switch avg_days in [1, 3, 7, 15]
-avg_days = 3
+avg_days = 7
 '''
 weather = pd.read_csv('Weather_filled_avg_' + avg_days + '.csv')
 weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
@@ -82,7 +82,7 @@ except:
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 2
+flowrate_threshold = 0.66
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -340,8 +340,12 @@ test = np.array(test[:, :])
 #test = np.c_[test[:, 0], test[:, 2], test[:, 5], test[:, 7:]]
 
 #year, 5 weather, SF
-train = np.c_[train[:, 0], train[:, 2:]]
-test = np.c_[test[:, 0], test[:, 2:]]
+y_train_scaled = train[:, 8]#avoid to scale flowrate
+y_test_scaled = test[:, 8]
+
+#year, 5 weather, SF
+train = np.c_[train[:, 0], train[:, 2:8]]
+test = np.c_[test[:, 0], test[:, 2:8]]
 '''
 # One_Hot Encoding
 from sklearn.compose import ColumnTransformer
@@ -359,6 +363,9 @@ from sklearn.preprocessing import MinMaxScaler
 scaler = MinMaxScaler(feature_range=(0, 1), copy=True)
 scaled_train = scaler.fit_transform(train)
 scaled_test = scaler.transform(test)
+
+scaled_train = np.c_[scaled_train[:, :], y_train_scaled[:]]
+scaled_test = np.c_[scaled_test[:, :], y_test_scaled[:]]
 
 # Constructing a LSTM
 from tensorflow.keras.models import Sequential
@@ -465,7 +472,7 @@ for time_step in (3, 7, 15, 30):
 # =============================================================================
 # New LSTM
 # =============================================================================
-time_step = 7
+time_step = 30
 print('Below are results for time_step:', time_step)
 X_train, y_train, y_train_not_scaled = [], [], []
 for i in range(time_step, len(train)):
@@ -477,7 +484,8 @@ for i in range(time_step, len(train)):
         X_train.append(sample_input)
         y_train.append(scaled_train[i, -1])
         y_train_not_scaled.append(train[i, -1])
-X_train, y_train = np.array(X_train), np.array(y_train)
+X_train, y_train = np.array(X_train).astype('float32'), np.array(y_train).astype('float32')
+
 # Ignore the WARNING here, numpy version problem
     
 X_test, y_test, y_test_not_scaled = [], [], []
@@ -490,7 +498,7 @@ for i in range(time_step, len(test)):
         X_test.append(sample_input)
         y_test.append(scaled_test[i, -1])
         y_test_not_scaled.append(test[i, -1])
-X_test, y_test = np.array(X_test), np.array(y_test)
+X_test, y_test = np.array(X_test).astype('float32'), np.array(y_test).astype('float32')
 
 '''
 from sklearn.model_selection import KFold
