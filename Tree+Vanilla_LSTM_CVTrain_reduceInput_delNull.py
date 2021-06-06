@@ -31,11 +31,16 @@ flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-avg_days = 1
-time_step = 60
+avg_days = 6
+time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 1029
+seed = 1
 
+train_startDate = '1990-01-01'
+test_startDate = '2013-01-01'
+endDate = '2013-12-31'
+
+# =============================================================================
 flowrate.columns = ['sample_date', 'flow']
 # Converting date string to datetime
 flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d')
@@ -117,8 +122,8 @@ X = pd.DataFrame(X, index=X[:, 8])
 X = X.drop(2,1)
 X.dropna(inplace=True)#just for double-check there won't be nan to feed the DT
 
-X_test = X.loc['2013-01-01':'2013-12-31'].values
-X = X.loc['1990-01-01':'2013-01-01'].values#Changed
+X_test = X.loc[test_startDate : endDate].values
+X = X.loc[train_startDate : test_startDate].values#Changed
 datetime = X[:, 7]
 y = X[:, 8]
 
@@ -292,8 +297,8 @@ Decreasing thresholds on the decision function used to compute fpr and tpr. thre
 # =============================================================================
 # LSTM continue
 # =============================================================================
-test = merge.loc['2013-01-01':'2013-12-31'].drop(8,1).drop(2,1).values#drop date and datetime columns
-train = merge.loc['1990-01-01':'2013-01-01'].drop(8,1).drop(2,1).values#Changed
+test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values#drop date and datetime columns
+train = merge.loc[train_startDate : test_startDate].drop(8,1).drop(2,1).values#Changed
 
 # Building X for decision tree
 X_DT = np.array(train[:,1:7])#eliminate 'year', 'day' features
@@ -318,8 +323,8 @@ merge = np.array(merge)
 merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
 
-test = merge.loc['2013-01-01':'2013-12-31'].drop(8,1).drop(2,1).values
-train = merge.loc['1990-01-01':'2013-01-01'].drop(8,1).drop(2,1).values#Changed
+test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values
+train = merge.loc[train_startDate : test_startDate].drop(8,1).drop(2,1).values#Changed
 ##############################################################################
 
 train[:, 7] = melt_train
@@ -336,9 +341,9 @@ test = np.array(test[:, :])
 #train = np.c_[train[:, 0], train[:, 2], train[:, 5], train[:, 7:]]
 #test = np.c_[test[:, 0], test[:, 2], test[:, 5], test[:, 7:]]
 
-#year, 5 weather, SF
-train = np.c_[train[:, 0], train[:, 2:]]
-test = np.c_[test[:, 0], test[:, 2:]]
+#year, 4 weather, SF
+train = np.c_[train[:, 0], train[:, 2:6], train[:, 7:]]
+test = np.c_[test[:, 0], test[:, 2:6], test[:, 7:]]
 
 # Scaling
 from sklearn.preprocessing import MinMaxScaler
@@ -377,7 +382,7 @@ for i in range(0, len(X_train)):
     if k>=len(X_train):
         break
     for j in X_train[k, :, :]:
-        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]) or np.isnan(j[5]):
+        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]):
             #print('k:', k)# for testing print out which sample contains NaN
             X_train = np.r_[X_train[:k, :, :], X_train[k+1:, :, :]]
             y_train = np.r_[y_train[:k], y_train[k+1:]]
@@ -385,13 +390,13 @@ for i in range(0, len(X_train)):
             k = k - 1
             break
     k = k + 1
-# 335 available for training
+# 338 available for training
 k = 0
 for i in range(0, len(X_test)):
     if k>=len(X_test):
         break
     for j in X_test[k, :, :]:
-        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]) or np.isnan(j[5]):
+        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]):
             #print('k:', k)
             X_test = np.r_[X_test[:k, :, :], X_test[k+1:, :, :]]
             y_test = np.r_[y_test[:k], y_test[k+1:]]
@@ -412,7 +417,7 @@ import matplotlib.pyplot as plt
 tf.keras.backend.clear_session()
 tf.random.set_seed(seed)
 
-opt = tf.keras.optimizers.Adam(learning_rate=0.00001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
+opt = tf.keras.optimizers.Adam(learning_rate=0.001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
@@ -437,7 +442,7 @@ def create_LSTM(neurons, dropoutRate, constraints):
                        bias_constraint=max_norm(constraints)))
 
     # Adding output layer
-    regressor.add(Dense(units=1, kernel_initializer='random_normal', activation='relu'))# Output layer do not need specify the activation function
+    regressor.add(Dense(units=1, kernel_initializer='glorot_uniform', activation='relu'))# Output layer do not need specify the activation function
     
     # Compiling the RNN by usign right optimizer and right loss function
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
@@ -480,18 +485,19 @@ for time_step in (3, 7, 15, 30):
 # =============================================================================
 # New LSTM
 # =============================================================================
-best_neurons = 100
+best_neurons = 50
 best_dropoutRate = 0.1
 constraints = 3
 
 epochs_max = 500
 batch_size = 4
-patience = 3
+#patience = 10
 
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
+'''
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
 # Using early stopping to train the model
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, 
@@ -509,7 +515,8 @@ if early_stop_callback.stopped_epoch == 0:
     early_epoch = epochs_max
 else:
     early_epoch = early_stop_callback.stopped_epoch
-#early_epoch = 100
+'''
+early_epoch = 100
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
@@ -521,22 +528,40 @@ plt.plot(r.history['loss'], label='loss')
 plt.legend()
 plt.show()
 
-y_pred_scaled = regressor.predict(X_test)
 sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
+
+y_pred_scaled = regressor.predict(X_test)
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
+
+y_pred_scaled_train = regressor.predict(X_train)
+y_pred_train = sc_flow.inverse_transform(y_pred_scaled_train)
+
+# =============================================================================
+# Plotting the training and test prediction
+# =============================================================================
+test_index = merge.loc[test_startDate : endDate].dropna().index[1:]
+train_index = merge.loc[train_startDate : test_startDate].dropna().index[4:]
+
+plt.plot(test_index, y_pred, label='test pred')
+plt.plot(train_index, y_pred_train, label='train pred')
+#plt.plot(train_index, y_train_not_scaled, label='train')
+#plt.plot(test_index, y_test_not_scaled, label='test')
+plt.legend(loc='best')
+plt.show()
 
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
-np.savetxt('FRO_KC1_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
+#np.savetxt('FRO_KC1_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
 
 # =============================================================================
 # Saving the training results
 # =============================================================================
-regressor.save_weights('./FRO_KC1_')
+regressor.save_weights('./LSTM results/FRO_KC1_6Input')
+
 # Restore the weights
-#regressor.load_weights('./FRO_KC1_')#Skip compiling and fitting process
+#regressor.load_weights('./LSTM results/FRO_KC1_6Input')#Skip compiling and fitting process
 
 # =============================================================================
 # Predicting on 2013 everyday weather data

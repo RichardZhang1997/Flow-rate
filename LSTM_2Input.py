@@ -36,6 +36,10 @@ time_step = 10
 gap_days = 0
 seed = 1
 
+train_startDate = '1990-01-01'
+test_startDate = '2013-01-01'
+endDate = '2013-12-31'
+
 # =============================================================================
 # Defining functions
 # =============================================================================
@@ -77,8 +81,8 @@ weather = weather.drop('Date/Time', 1)
 merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge.index = merge['Datetime']
 
-test = merge.loc['2013-01-01':'2013-12-31'].values
-train = merge.loc['1990-01-01':'2013-01-01'].values
+test = merge.loc[test_startDate : endDate].values
+train = merge.loc[train_startDate : test_startDate].values
 
 # Two inputs are mean temperature and total precipitate
 test = np.c_[test[:, 3], test[:, 6], test[:, 9]]
@@ -182,7 +186,7 @@ def create_LSTM(neurons, dropoutRate, constraints):
                        bias_constraint=max_norm(constraints)))
 
     # Adding output layer
-    regressor.add(Dense(units=1, kernel_initializer='glorot_uniform'))# Output layer do not need specify the activation function
+    regressor.add(Dense(units=1, kernel_initializer='glorot_uniform', activation='relu'))# Output layer do not need specify the activation function
     
     # Compiling the RNN by usign right optimizer and right loss function
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
@@ -194,13 +198,14 @@ best_dropoutRate = 0
 constraints = 3
 
 epochs_max = 500
-batch_size = 1
-patience = 5
+batch_size = 4
+patience = 20
 
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
+'''
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
 # Using early stopping to train the model
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, 
@@ -218,8 +223,10 @@ if early_stop_callback.stopped_epoch == 0:
     early_epoch = epochs_max
 else:
     early_epoch = early_stop_callback.stopped_epoch
-#early_epoch = 100
-    
+'''
+
+early_epoch = 100
+
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
@@ -239,13 +246,15 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 y_pred_scaled_train = regressor.predict(X_train)
 y_pred_train = sc_flow.inverse_transform(y_pred_scaled_train)
 
-test_index = merge.loc['2013-01-01':'2013-12-31'].dropna().index[1:]
-train_index = merge.loc['1990-01-01':'2013-01-01'].dropna().index[4:]
+# =============================================================================
+# Plotting the training and test prediction
+# =============================================================================
+test_index = merge.loc[test_startDate : endDate].dropna().index[1:]
+train_index = merge.loc[train_startDate : test_startDate].dropna().index[4:]
 
-#Plotting
 plt.plot(test_index, y_pred, label='test pred')
 plt.plot(train_index, y_pred_train, label='train pred')
-plt.plot(train_index, y_train_not_scaled, label='train')
+#plt.plot(train_index, y_train_not_scaled, label='train')
 plt.plot(test_index, y_test_not_scaled, label='test')
 plt.legend(loc='best')
 plt.show()
@@ -256,7 +265,7 @@ rootMSE(y_test_not_scaled, y_pred)
 # =============================================================================
 # Saving the training results
 # =============================================================================
-regressor.save_weights('./FRO_KC1_2Input')
-regressor.save_weights('./FRO_KC1_')
+regressor.save_weights('./LSTM results/FRO_KC1_2Input')
+
 # Restore the weights
-#regressor.load_weights('./FRO_KC1_')#Skip compiling and fitting process
+#regressor.load_weights('./LSTM results/FRO_KC1_2Input')#Skip compiling and fitting process

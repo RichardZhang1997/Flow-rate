@@ -26,6 +26,10 @@ time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
 seed = 1029
 
+train_startDate = '1980-01-01'
+test_startDate = '2018-01-01'
+endDate = '2020-12-31'
+
 # =============================================================================
 # Unifying the format
 # =============================================================================
@@ -111,8 +115,8 @@ X = pd.DataFrame(X, index=X[:, 8])
 X = X.drop(2,1)
 X.dropna(inplace=True)#just for double-check there won't be nan to feed the DT
 
-X_test = X.loc['2018-01-01':'2020-12-31'].values
-X = X.loc['1980-01-01':'2018-01-01'].values#2 years for testing
+X_test = X.loc[test_startDate : endDate].values
+X = X.loc[train_startDate : test_startDate].values#2 years for testing
 datetime = X[:, 7]
 y = X[:, 8]
 
@@ -286,8 +290,8 @@ Decreasing thresholds on the decision function used to compute fpr and tpr. thre
 # =============================================================================
 # LSTM continue
 # =============================================================================
-test = merge.loc['2018-01-01':'2020-12-31'].drop(8,1).drop(2,1).values#drop date and datetime columns
-train = merge.loc['1980-01-01':'2018-01-01'].drop(8,1).drop(2,1).values#Changed
+test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values#drop date and datetime columns
+train = merge.loc[train_startDate : test_startDate].drop(8,1).drop(2,1).values#Changed
 
 # Building X for decision tree
 X_DT = np.array(train[:,1:7])#eliminate 'year', 'day' features
@@ -312,8 +316,8 @@ merge = np.array(merge)
 merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
 
-test = merge.loc['2018-01-01':'2020-12-31'].drop(8,1).drop(2,1).values
-train = merge.loc['1980-01-01':'2018-01-01'].drop(8,1).drop(2,1).values#Changed
+test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values
+train = merge.loc[train_startDate : test_startDate].drop(8,1).drop(2,1).values#Changed
 ##############################################################################
 
 train[:, 7] = melt_train
