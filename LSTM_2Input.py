@@ -34,7 +34,7 @@ flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
 avg_days = 6
 time_step = 10
 gap_days = 0
-seed = 1029
+seed = 1
 
 # =============================================================================
 # Defining functions
@@ -156,7 +156,7 @@ import matplotlib.pyplot as plt
 tf.keras.backend.clear_session()
 tf.random.set_seed(seed)
 
-opt = tf.keras.optimizers.SGD(learning_rate=0.00001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
+opt = tf.keras.optimizers.Adam(learning_rate=0.001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
 
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
@@ -182,15 +182,13 @@ def create_LSTM(neurons, dropoutRate, constraints):
                        bias_constraint=max_norm(constraints)))
 
     # Adding output layer
-    regressor.add(Dense(units=1, kernel_initializer='random_normal'))# Output layer do not need specify the activation function
+    regressor.add(Dense(units=1, kernel_initializer='glorot_uniform'))# Output layer do not need specify the activation function
     
     # Compiling the RNN by usign right optimizer and right loss function
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
 
 #Defining training parameters
-gap_days = 0 #No. of days between the last day of input and the predict date
-
 best_neurons = 5
 best_dropoutRate = 0
 constraints = 3
@@ -220,7 +218,7 @@ if early_stop_callback.stopped_epoch == 0:
     early_epoch = epochs_max
 else:
     early_epoch = early_stop_callback.stopped_epoch
-#early_epoch = 150
+#early_epoch = 100
     
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
@@ -232,10 +230,33 @@ plt.plot(r.history['loss'], label='loss')
 plt.legend()
 plt.show()
 
-y_pred_scaled = regressor.predict(X_test)
 sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
+
+y_pred_scaled = regressor.predict(X_test)
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
+
+y_pred_scaled_train = regressor.predict(X_train)
+y_pred_train = sc_flow.inverse_transform(y_pred_scaled_train)
+
+test_index = merge.loc['2013-01-01':'2013-12-31'].dropna().index[1:]
+train_index = merge.loc['1990-01-01':'2013-01-01'].dropna().index[4:]
+
+#Plotting
+plt.plot(test_index, y_pred, label='test pred')
+plt.plot(train_index, y_pred_train, label='train pred')
+plt.plot(train_index, y_train_not_scaled, label='train')
+plt.plot(test_index, y_test_not_scaled, label='test')
+plt.legend(loc='best')
+plt.show()
 
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
+
+# =============================================================================
+# Saving the training results
+# =============================================================================
+regressor.save_weights('./FRO_KC1_2Input')
+regressor.save_weights('./FRO_KC1_')
+# Restore the weights
+#regressor.load_weights('./FRO_KC1_')#Skip compiling and fitting process
