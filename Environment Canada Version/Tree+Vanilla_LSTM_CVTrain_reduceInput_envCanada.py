@@ -4,7 +4,6 @@ Created on Wed Sep  9 10:21:14 2020
 
 @author: Richa
 """
-
 import os
 os.chdir("D:\\Study\\Marko Mine\\Flowrate")
 
@@ -15,27 +14,20 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
-flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
-##flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
+station = '08NG002'
+flowrate = pd.read_csv('Environment Canada\\Flowrate\\'+station+'.csv', usecols=[2, 3], skiprows=[0])
 
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-avg_days = 1
-time_step = 60
+avg_days = 6
+time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
 seed = 1029
 
+# =============================================================================
+# Unifying the format
+# =============================================================================
 flowrate.columns = ['sample_date', 'flow']
 # Converting date string to datetime
 flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d')
@@ -82,7 +74,7 @@ except:
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 2
+flowrate_threshold = 70
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -117,8 +109,8 @@ X = pd.DataFrame(X, index=X[:, 8])
 X = X.drop(2,1)
 X.dropna(inplace=True)#just for double-check there won't be nan to feed the DT
 
-X_test = X.loc['2013-01-01':'2013-12-31'].values
-X = X.loc['1990-01-01':'2013-01-01'].values#Changed
+X_test = X.loc['2018-01-01':'2020-12-31'].values
+X = X.loc['1990-01-01':'2018-01-01'].values#Changed
 datetime = X[:, 7]
 y = X[:, 8]
 
@@ -169,7 +161,7 @@ np.random.seed(seed)
 from sklearn.model_selection import GridSearchCV
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_FRO_KC1.joblib')
+    classifier = load('DecisionTreeForLSTM_'+station+'.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -191,7 +183,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_FRO_KC1.joblib')#To be changed
+    dump(classifier, 'DecisionTreeForLSTM_'+station+'.joblib')#To be changed
     print('Decision tree training result saved')
 
 # Prediction
@@ -443,10 +435,13 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
 
-'''
+#Defining training parameters
+gap_days = 0 #No. of days between the last day of input and the predict date
+
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 for time_step in (3, 7, 15, 30):
     print('Below are results for time_step:', time_step)
+    
     # Creating the model
     regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)#Default CV parameters, not that accurate
     parameters = {'neurons':(5, 50, 100),
@@ -476,7 +471,7 @@ for time_step in (3, 7, 15, 30):
     
     #Evaluation
     rootMSE(y_test_not_scaled, y_pred)
-'''
+
 # =============================================================================
 # New LSTM
 # =============================================================================
@@ -496,7 +491,7 @@ regressor = create_LSTM(neurons=best_neurons,
 # Using early stopping to train the model
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, 
                                             min_delta=0, restore_best_weights=True)#change patience number
-r = regressor.fit(X_train.astype('float64'), y_train.astype('float64'), epochs=epochs_max, batch_size=batch_size, 
+r = regressor.fit(X_train, y_train, epochs=epochs_max, batch_size=batch_size, 
               callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
 regressor.summary()
 # Plot loss per iteration
@@ -529,7 +524,7 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
-np.savetxt('FRO_KC1_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
+np.savetxt(station+'_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
 
 # =============================================================================
 # Saving the training results

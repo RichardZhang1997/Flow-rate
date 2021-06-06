@@ -6,7 +6,7 @@ Created on Fri Oct 23 17:27:57 2020
 """
 
 import os
-os.chdir("C:\\MyFile\\Study\\Graduate\\Marko MIne\\Flowrate")
+os.chdir("D:\\Study\\Marko Mine\\Flowrate")
 
 # Importing the libraries
 import numpy as np
@@ -196,3 +196,10 @@ plt.title('Snow Depth Distribution of Sparwood Station', pad=10)#pad是标题离
 plt.show()
 
 print(weather.describe())
+
+#Correlation analysis
+import seaborn as sns
+merge = pd.read_csv('MATLAB\\flattened_X for ANN+target.csv')
+corr = merge.apply(lambda x:x.astype(float)).corr()
+feature_names = merge.columns
+sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names)

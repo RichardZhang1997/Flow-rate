@@ -15,27 +15,20 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
-flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
-##flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
+station = '08NG002'
+flowrate = pd.read_csv('Environment Canada\\Flowrate\\'+station+'.csv', usecols=[2, 3], skiprows=[0])
 
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-avg_days = 1
-time_step = 60
+avg_days = 6
+time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
 seed = 1029
 
+# =============================================================================
+# Unifying the format
+# =============================================================================
 flowrate.columns = ['sample_date', 'flow']
 # Converting date string to datetime
 flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d')
@@ -46,14 +39,15 @@ flowrate = flowrate.drop('sample_date', 1)
 # Missing weather data filling (average weather input enabled)
 # =============================================================================
 try:
-    weather = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
+    weather = pd.read_csv('Environment Canada\\Weather\\Sparwood\\Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1)
+    #weather data for the tree must NOT be averaged
     weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
     print('Filled weather data loaded successfully')
 except:
     print('Filled weather data not detected, generating...')
     #weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
     #                  usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
-    weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
+    weather = pd.read_csv('Environment Canada\\Weather\\Sparwood\\weather_1980-2020_avg_' + str(avg_days) + '.csv')
     weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
     weather = weather.drop('Date/Time', 1)
     print(weather.describe())
@@ -76,13 +70,13 @@ except:
     weather = weather_copy.drop(columns=['Mean Temp (C)_1', 'Total Rain (mm)_1', 
                                          'Total Snow (cm)_1', 'Total Precip (mm)_1',
                                          'Snow on Grnd (cm)_1'])
-    pd.DataFrame(weather).to_csv('Weather_filled_avg_' + str(avg_days) + '.csv')
+    pd.DataFrame(weather).to_csv('Environment Canada\\Weather\\Sparwood\\Weather_filled_avg_' + str(avg_days) + '.csv')
     print('Filled weather data saved successfully')
 
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 2
+flowrate_threshold = 70
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -117,8 +111,8 @@ X = pd.DataFrame(X, index=X[:, 8])
 X = X.drop(2,1)
 X.dropna(inplace=True)#just for double-check there won't be nan to feed the DT
 
-X_test = X.loc['2013-01-01':'2013-12-31'].values
-X = X.loc['1990-01-01':'2013-01-01'].values#Changed
+X_test = X.loc['2018-01-01':'2020-12-31'].values
+X = X.loc['1980-01-01':'2018-01-01'].values#2 years for testing
 datetime = X[:, 7]
 y = X[:, 8]
 
@@ -169,7 +163,7 @@ np.random.seed(seed)
 from sklearn.model_selection import GridSearchCV
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_FRO_KC1.joblib')
+    classifier = load('DecisionTreeForLSTM_'+station+'.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -191,7 +185,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_FRO_KC1.joblib')#To be changed
+    dump(classifier, 'DecisionTreeForLSTM_'+station+'.joblib')#To be changed
     print('Decision tree training result saved')
 
 # Prediction
@@ -292,8 +286,8 @@ Decreasing thresholds on the decision function used to compute fpr and tpr. thre
 # =============================================================================
 # LSTM continue
 # =============================================================================
-test = merge.loc['2013-01-01':'2013-12-31'].drop(8,1).drop(2,1).values#drop date and datetime columns
-train = merge.loc['1990-01-01':'2013-01-01'].drop(8,1).drop(2,1).values#Changed
+test = merge.loc['2018-01-01':'2020-12-31'].drop(8,1).drop(2,1).values#drop date and datetime columns
+train = merge.loc['1980-01-01':'2018-01-01'].drop(8,1).drop(2,1).values#Changed
 
 # Building X for decision tree
 X_DT = np.array(train[:,1:7])#eliminate 'year', 'day' features
@@ -307,7 +301,7 @@ melt_test = classifier.predict(X_test_DT)
 
 ##############################################################################
 # Load not filled weather data (delete NaNs for input of LSTM)
-weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
+weather = pd.read_csv('Environment Canada\\Weather\\Sparwood\\weather_1980-2020_avg_' + str(avg_days) + '.csv')
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
 print('Non-filled and averaged weather data loaded successfully')
@@ -318,8 +312,8 @@ merge = np.array(merge)
 merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
 
-test = merge.loc['2013-01-01':'2013-12-31'].drop(8,1).drop(2,1).values
-train = merge.loc['1990-01-01':'2013-01-01'].drop(8,1).drop(2,1).values#Changed
+test = merge.loc['2018-01-01':'2020-12-31'].drop(8,1).drop(2,1).values
+train = merge.loc['1980-01-01':'2018-01-01'].drop(8,1).drop(2,1).values#Changed
 ##############################################################################
 
 train[:, 7] = melt_train
@@ -336,9 +330,9 @@ test = np.array(test[:, :])
 #train = np.c_[train[:, 0], train[:, 2], train[:, 5], train[:, 7:]]
 #test = np.c_[test[:, 0], test[:, 2], test[:, 5], test[:, 7:]]
 
-#year, 5 weather, SF
-train = np.c_[train[:, 0], train[:, 2:]]
-test = np.c_[test[:, 0], test[:, 2:]]
+#year, 4 weather, SF
+train = np.c_[train[:, 0], train[:, 2:6], train[:, 7:]]
+test = np.c_[test[:, 0], test[:, 2:6], test[:, 7:]]
 
 # Scaling
 from sklearn.preprocessing import MinMaxScaler
@@ -377,7 +371,7 @@ for i in range(0, len(X_train)):
     if k>=len(X_train):
         break
     for j in X_train[k, :, :]:
-        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]) or np.isnan(j[5]):
+        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]):
             #print('k:', k)# for testing print out which sample contains NaN
             X_train = np.r_[X_train[:k, :, :], X_train[k+1:, :, :]]
             y_train = np.r_[y_train[:k], y_train[k+1:]]
@@ -385,13 +379,13 @@ for i in range(0, len(X_train)):
             k = k - 1
             break
     k = k + 1
-# 335 available for training
+# 12839 available for training
 k = 0
 for i in range(0, len(X_test)):
     if k>=len(X_test):
         break
     for j in X_test[k, :, :]:
-        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]) or np.isnan(j[5]):
+        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]):
             #print('k:', k)
             X_test = np.r_[X_test[:k, :, :], X_test[k+1:, :, :]]
             y_test = np.r_[y_test[:k], y_test[k+1:]]
@@ -399,7 +393,7 @@ for i in range(0, len(X_test)):
             k = k - 1
             break
     k = k + 1
-# 22 available for testing
+# 728 available for testing
 
 # Constructing a LSTM
 from tensorflow.keras.models import Sequential
@@ -504,7 +498,7 @@ plt.plot(r.history['loss'], label='loss')
 plt.plot(r.history['val_loss'], label='val_loss')
 plt.legend()
 plt.show()
-
+'''
 if early_stop_callback.stopped_epoch == 0:
     early_epoch = epochs_max
 else:
@@ -520,7 +514,7 @@ r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size)
 plt.plot(r.history['loss'], label='loss')
 plt.legend()
 plt.show()
-
+'''
 y_pred_scaled = regressor.predict(X_test)
 sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
@@ -529,7 +523,7 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
-np.savetxt('FRO_KC1_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
+np.savetxt('Environment Canada\\08NG002.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
 
 # =============================================================================
 # Saving the training results
