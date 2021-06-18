@@ -15,18 +15,8 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
-flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
-##flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
+station = 'FRO_KC1_filtered'
+flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
 # Choosing parameters
@@ -193,13 +183,13 @@ def create_LSTM(neurons, dropoutRate, constraints):
     return regressor
 
 #Defining training parameters
-best_neurons = 5
-best_dropoutRate = 0
+best_neurons = 50
+best_dropoutRate = 0.1
 constraints = 3
 
-epochs_max = 500
+#epochs_max = 500
 batch_size = 4
-patience = 20
+#patience = 20
 
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
@@ -246,26 +236,31 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 y_pred_scaled_train = regressor.predict(X_train)
 y_pred_train = sc_flow.inverse_transform(y_pred_scaled_train)
 
-# =============================================================================
-# Plotting the training and test prediction
-# =============================================================================
-test_index = merge.loc[test_startDate : endDate].dropna().index[1:]
-train_index = merge.loc[train_startDate : test_startDate].dropna().index[4:]
-
-plt.plot(test_index, y_pred, label='test pred')
-plt.plot(train_index, y_pred_train, label='train pred')
-#plt.plot(train_index, y_train_not_scaled, label='train')
-plt.plot(test_index, y_test_not_scaled, label='test')
-plt.legend(loc='best')
-plt.show()
-
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
 # =============================================================================
+# Plotting the training and test prediction
+# =============================================================================
+#plt.plot(test_datetime, y_test_not_scaled, label='test')
+#plt.plot(test_datetime, y_pred, label='test pred')#x-label requires turning angle
+#plt.plot(train_datetime, y_pred_train, label='train pred')
+#plt.plot(train_datetime, y_train_not_scaled, label='train')
+#plt.xticks(train_datetime, train_datetime, rotation = 'vertical')
+plt.legend(loc='best')
+plt.show()
+'''
+# =============================================================================
 # Saving the training results
 # =============================================================================
-regressor.save_weights('./LSTM results/FRO_KC1_2Input')
+# Saving prediction on test set
+np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred],fmt='%s',delimiter=',')
+
+# Saving prediction on train set
+np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
+
+regressor.save_weights('./LSTM results/'+station+'_3Input')
 
 # Restore the weights
-#regressor.load_weights('./LSTM results/FRO_KC1_2Input')#Skip compiling and fitting process
+#regressor.load_weights('./LSTM results/'+station+'_3Input')#Skip compiling and fitting process
+'''

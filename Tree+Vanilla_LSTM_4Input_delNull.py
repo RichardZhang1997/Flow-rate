@@ -6,18 +6,18 @@ Created on Wed Sep  9 10:21:14 2020
 """
 
 import os
-#os.chdir("C:\\MyFile\\Study\\Graduate\\Marko Mine\\Flowrate")
 os.chdir("D:\\Study\\Marko Mine\\Flowrate")
 
 # Importing the libraries
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = '08NG002'
-flowrate = pd.read_csv('Environment Canada\\Flowrate\\'+station+'.csv', usecols=[2, 3], skiprows=[0])
+station = 'EVO_SM1'
+flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
 # Choosing parameters
@@ -25,12 +25,12 @@ flowrate = pd.read_csv('Environment Canada\\Flowrate\\'+station+'.csv', usecols=
 avg_days = 1#here is the average days for decision tree input, later to be changed to 6 for LSTM
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 37#seed gave the best prediction result for FRO KC1 station, keep it 26
-flowrate_threshold = 70
+seed = 99#seed gave the best prediction result for FRO KC1 station, keep it 26
+flowrate_threshold = 0.05
 
-train_startDate = '1980-01-01'
-test_startDate = '2019-01-01'
-endDate = '2020-12-31'
+train_startDate = '1990-01-01'
+test_startDate = '2012-01-01'
+endDate = '2012-12-31'
 
 # =============================================================================
 flowrate.columns = ['sample_date', 'flow']
@@ -43,12 +43,14 @@ flowrate = flowrate.drop('sample_date', 1)
 # Missing weather data filling (average weather input enabled)
 # =============================================================================
 try:
-    weather = pd.read_csv('Environment Canada\\Weather\\Sparwood\\Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
+    weather = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
     weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
     print('Filled weather data loaded successfully')
 except:
     print('Filled weather data not detected, generating...')
-    weather = pd.read_csv('Environment Canada\\Weather\\Sparwood\\weather_1980-2020_avg_' + str(avg_days) + '.csv')
+    #weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
+    #                  usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+    weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
     weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
     weather = weather.drop('Date/Time', 1)
     print(weather.describe())
@@ -71,7 +73,7 @@ except:
     weather = weather_copy.drop(columns=['Mean Temp (C)_1', 'Total Rain (mm)_1', 
                                          'Total Snow (cm)_1', 'Total Precip (mm)_1',
                                          'Snow on Grnd (cm)_1'])
-    pd.DataFrame(weather).to_csv('Environment Canada\\Weather\\Sparwood\\Weather_filled_avg_' + str(avg_days) + '.csv')
+    pd.DataFrame(weather).to_csv('Weather_filled_avg_' + str(avg_days) + '.csv')
     print('Filled weather data saved successfully')
 
 # =============================================================================
@@ -201,6 +203,7 @@ try:
     print(classification_report(np.int32(y_test), y_pred))
 except:
     print("ROC doesn't exist")
+
 #springFS_pred_test = y_pred.copy()
 '''
 # =============================================================================
@@ -211,22 +214,25 @@ from IPython.display import Image
 from six import StringIO
 import pydotplus
 # Need to install GraphViz and pydotplus
-feature_names = pd.DataFrame(weather.columns[1:-1])#eliminate 'year' feature name
+feature_names = pd.DataFrame(['Month','Mean Temp','Rain','Snow','Precip'])#eliminate 'year' feature name
 #feature_names = feature_names.append(pd.DataFrame(weather.columns[3:-1]))#for more than 1 day
 feature_names = np.array(feature_names).tolist()
-# 文件缓存
+# File cache
 dot_data = StringIO()
-# 将决策树导入到dot中
+# Pour decision tree into dot
 export_graphviz(classifier, out_file=dot_data,  
                 filled=True, rounded=True,
                 special_characters=True,
                 feature_names = feature_names,
                 class_names=['NotSF','SF'])
-# 将生成的dot文件生成graph
+# Transfer the generated dot file to a graph
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-# 将结果存入到png文件中
-graph.write_png('Visualization\Decision_tree_evaluation\Decision_tree_LCO_LC3.png')
-# 显示
+# Save the result to png
+try:
+    graph.write_png('Visualization\Decision_tree_evaluation\Decision_tree_'+station+'.png')
+except:
+    print('Failed to save the png file, choose another directory.')
+# Display
 Image(graph.create_png())
 '''
 
@@ -278,13 +284,6 @@ plt.title('ROC Graph of LCO LC3 Station')
 plt.legend(loc="lower right")
 plt.show()
 '''
-'''
-sklearn.metrics.roc_curve(y_true, y_score, *, pos_label=None, sample_weight=None, drop_intermediate=True)
-y_scorendarray of shape (n_samples,)
-Target scores, can either be probability estimates of the positive class, confidence values, or non-thresholded measure of decisions (as returned by “decision_function” on some classifiers).
-thresholdsndarray of shape = (n_thresholds,)
-Decreasing thresholds on the decision function used to compute fpr and tpr. thresholds[0] represents no instances being predicted and is arbitrarily set to max(y_score) + 1.
-'''
 
 # =============================================================================
 # LSTM continue
@@ -305,7 +304,7 @@ melt_test = classifier.predict(X_test_DT)
 ##############################################################################
 # Load not filled weather data (delete NaNs for input of LSTM)
 avg_days = 6
-weather = pd.read_csv('Environment Canada\\Weather\\Sparwood\\weather_1980-2020_avg_' + str(avg_days) + '.csv')
+weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
 print('Non-filled and averaged weather data loaded successfully')
@@ -411,7 +410,6 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
 from tensorflow.keras.constraints import max_norm
 import tensorflow as tf
-import matplotlib.pyplot as plt
 
 #print(tf.__version__)
 tf.keras.backend.clear_session()
@@ -516,7 +514,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 10
+early_epoch = 40
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
@@ -525,11 +523,12 @@ regressor = create_LSTM(neurons=best_neurons,
                         constraints=constraints)
 
 r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size, 
-                  validation_data=(X_test, y_test), validation_freq=1)
+                  validation_data=(X_test, y_test), validation_freq=5)
 regressor.summary()
 
 plt.plot(range(1,early_epoch+1), r.history['loss'], label='loss')
-plt.plot(range(1,early_epoch+1), r.history['val_loss'], label='val_loss')
+plt.plot(np.linspace(0,100,21,endpoint=True)[1:int(int(early_epoch/5)+1)], 
+         r.history['val_loss'], label='val_loss')
 plt.legend()
 plt.show()
 
@@ -569,18 +568,18 @@ np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_p
 regressor.save_weights('./LSTM results/'+station+'_4Input')
 
 # Restore the weights
-#regressor.load_weights('./LSTM results/FRO_KC1_4Input')#Skip compiling and fitting process
+#regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # =============================================================================
 # Predicting on 2013 everyday weather data
 # =============================================================================
-weather_dense = pd.read_csv('Environment Canada\\Weather\\Sparwood\\Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
+weather_dense = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
 weather_dense = np.array(weather_dense)
 
 X_test_DT = np.c_[weather_dense[:,1:2], weather_dense[:,3:7]]
 melt_test = classifier.predict(X_test_DT)
 
-weather_dense = pd.read_csv('Environment Canada\\Weather\\Sparwood\\weather_1980-2020_avg_' + str(avg_days) + '.csv')
+weather_dense = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
 weather_dense['Datetime'] = pd.to_datetime(weather_dense['Date/Time'], format='%Y/%m/%d')
 datetime = weather_dense['Datetime']
 
@@ -628,4 +627,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('pred_whole_1980-2020_'+station+'_4Input.csv',np.c_[test_datetime.reshape(-1, 1),y_pred],fmt='%s',delimiter=',')#test_datetime as x
+np.savetxt('pred_whole_1990-2013_'+station+'_Short_Input.csv',np.c_[test_datetime.reshape(-1, 1),y_pred],fmt='%s',delimiter=',')#test_datetime as x
