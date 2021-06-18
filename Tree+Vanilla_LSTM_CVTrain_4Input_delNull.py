@@ -15,30 +15,21 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
-flowrate = pd.read_csv('FRO_KC1_filtered.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
-##flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
+station = 'EVO_SM1'
+flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-avg_days = 6
+avg_days = 1#here is the average days for decision tree input, later to be changed to 6 for LSTM
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 1
+seed = 99#seed gave the best prediction result for FRO KC1 station, keep it 26
+flowrate_threshold = 0.05
 
 train_startDate = '1990-01-01'
-test_startDate = '2013-01-01'
-endDate = '2013-12-31'
+test_startDate = '2012-01-01'
+endDate = '2012-12-31'
 
 # =============================================================================
 flowrate.columns = ['sample_date', 'flow']
@@ -87,7 +78,6 @@ except:
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 2
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -124,10 +114,10 @@ X.dropna(inplace=True)#just for double-check there won't be nan to feed the DT
 
 X_test = X.loc[test_startDate : endDate].values
 X = X.loc[train_startDate : test_startDate].values#Changed
-datetime = X[:, 7]
+#datetime = X[:, 7]
 y = X[:, 8]
 
-X = X[:, 1:7]
+X = X[:, 1:6]
 #X = np.c_[X[:, 1:7], X[:, 9:]]#for more than 2 days
 #eliminate 'year' from the inputX = X[:, 1:8] 
 
@@ -136,7 +126,7 @@ X = X[:, 1:7]
 # =============================================================================
 y_test = X_test[:, 8]
 
-X_test = X_test[:, 1:7]
+X_test = X_test[:, 1:6]
 #X_test = np.c_[X_test[:, 1:7], X_test[:, 9:]]#for more than 2 days
 #X = X[:, 1:8] eliminate 'year' from the input
 
@@ -174,7 +164,7 @@ np.random.seed(seed)
 from sklearn.model_selection import GridSearchCV
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_FRO_KC1.joblib')
+    classifier = load('DecisionTreeForLSTM_'+station+'.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -196,7 +186,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_FRO_KC1.joblib')#To be changed
+    dump(classifier, 'DecisionTreeForLSTM_'+station+'.joblib')#To be changed
     print('Decision tree training result saved')
 
 # Prediction
@@ -205,10 +195,14 @@ y_pred = predict_test(X_test, classifier)
 accuracy = accuracy_print_conf(y_test, y_pred)
 
 #Indicator calculating
-from sklearn.metrics import roc_auc_score, classification_report
-dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
-print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
-print(classification_report(np.int32(y_test), y_pred))
+try:
+    from sklearn.metrics import roc_auc_score, classification_report
+    dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
+    print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
+    print(classification_report(np.int32(y_test), y_pred))
+except:
+    print("ROC doesn't exist")
+
 #springFS_pred_test = y_pred.copy()
 '''
 # =============================================================================
@@ -286,13 +280,6 @@ plt.title('ROC Graph of LCO LC3 Station')
 plt.legend(loc="lower right")
 plt.show()
 '''
-'''
-sklearn.metrics.roc_curve(y_true, y_score, *, pos_label=None, sample_weight=None, drop_intermediate=True)
-y_scorendarray of shape (n_samples,)
-Target scores, can either be probability estimates of the positive class, confidence values, or non-thresholded measure of decisions (as returned by “decision_function” on some classifiers).
-thresholdsndarray of shape = (n_thresholds,)
-Decreasing thresholds on the decision function used to compute fpr and tpr. thresholds[0] represents no instances being predicted and is arbitrarily set to max(y_score) + 1.
-'''
 
 # =============================================================================
 # LSTM continue
@@ -301,8 +288,8 @@ test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values#drop date 
 train = merge.loc[train_startDate : test_startDate].drop(8,1).drop(2,1).values#Changed
 
 # Building X for decision tree
-X_DT = np.array(train[:,1:7])#eliminate 'year', 'day' features
-X_test_DT = np.array(test[:,1:7])#eliminate 'year', day' features
+X_DT = np.array(train[:,1:6])#eliminate 'year', 'day' features
+X_test_DT = np.array(test[:,1:6])#eliminate 'year', day' features
 #X_DT = np.c_[train[1:,1:7], train[:-1, 2:7]]#for more than one days
 #X_test_DT = np.c_[test[1:,1:7], test[:-1, 2:7]]#for more than one days
 
@@ -312,6 +299,7 @@ melt_test = classifier.predict(X_test_DT)
 
 ##############################################################################
 # Load not filled weather data (delete NaNs for input of LSTM)
+avg_days = 6
 weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
@@ -325,6 +313,9 @@ merge = pd.DataFrame(merge, index=merge[:, 8])
 
 test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values
 train = merge.loc[train_startDate : test_startDate].drop(8,1).drop(2,1).values#Changed
+
+datetime_test = merge.loc[test_startDate : endDate].index[:].strftime('%Y-%m-%d')
+datetime_train = merge.loc[train_startDate : test_startDate].index[:].strftime('%Y-%m-%d')
 ##############################################################################
 
 train[:, 7] = melt_train
@@ -337,13 +328,9 @@ test = np.array(test[:, :])
 #train = np.array(train[1:, :])
 #test = np.array(test[1:, :])
 
-#year, temp, precip, SF
-#train = np.c_[train[:, 0], train[:, 2], train[:, 5], train[:, 7:]]
-#test = np.c_[test[:, 0], test[:, 2], test[:, 5], test[:, 7:]]
-
-#year, 4 weather, SF
-train = np.c_[train[:, 0], train[:, 2:6], train[:, 7:]]
-test = np.c_[test[:, 0], test[:, 2:6], test[:, 7:]]
+#year, 2 weather (mean temp, precipitate), SF
+train = np.c_[train[:, 0], train[:, 2], train[:, 5], train[:, 7:]]
+test = np.c_[test[:, 0], test[:, 2], test[:, 5], test[:, 7:]]
 
 # Scaling
 from sklearn.preprocessing import MinMaxScaler
@@ -353,9 +340,11 @@ scaled_test = scaler.transform(test)
 
 scaled = np.r_[scaled_train, scaled_test]
 original = np.r_[train, test]
+datetime = np.r_[datetime_train, datetime_test]
 
 print('Below are results for time_step:', time_step)
 X_scaled, y_scaled, y_not_scaled= [], [], []
+datetime_deNull = []
 for i in range(time_step, len(scaled)):
     if scaled[i][-1]>=0:
         sample_input = []
@@ -364,17 +353,21 @@ for i in range(time_step, len(scaled)):
         X_scaled.append(sample_input)
         y_scaled.append(scaled[i, -1])
         y_not_scaled.append(original[i, -1])
+        datetime_deNull.append(datetime[i])
 X_scaled, y_scaled, y_not_scaled = np.array(X_scaled), np.array(y_scaled), np.array(y_not_scaled)
+datetime_deNull = np.array(datetime_deNull)
 
 test_size = len(pd.DataFrame(test).dropna())#Number of valid test size
 
 X_train = X_scaled[:len(X_scaled)+1-test_size, :, :]
 y_train = y_scaled[:len(X_scaled)+1-test_size]
 y_train_not_scaled = y_not_scaled[:len(X_scaled)+1-test_size]
+train_datetime = datetime_deNull[:len(X_scaled)+1-test_size]
 
 X_test = X_scaled[len(X_scaled)+1-test_size:, :, :]
 y_test = y_scaled[len(X_scaled)+1-test_size:]
 y_test_not_scaled = y_not_scaled[len(X_scaled)+1-test_size:]
+test_datetime = datetime_deNull[len(X_scaled)+1-test_size:]
 
 # Deleting NaNs in samples
 k = 0
@@ -382,11 +375,12 @@ for i in range(0, len(X_train)):
     if k>=len(X_train):
         break
     for j in X_train[k, :, :]:
-        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]):
+        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]):
             #print('k:', k)# for testing print out which sample contains NaN
             X_train = np.r_[X_train[:k, :, :], X_train[k+1:, :, :]]
             y_train = np.r_[y_train[:k], y_train[k+1:]]
             y_train_not_scaled = np.r_[y_train_not_scaled[:k], y_train_not_scaled[k+1:]]
+            train_datetime = np.r_[train_datetime[:k], train_datetime[k+1:]]
             k = k - 1
             break
     k = k + 1
@@ -396,11 +390,12 @@ for i in range(0, len(X_test)):
     if k>=len(X_test):
         break
     for j in X_test[k, :, :]:
-        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]) or np.isnan(j[3]) or np.isnan(j[4]):
+        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]):
             #print('k:', k)
             X_test = np.r_[X_test[:k, :, :], X_test[k+1:, :, :]]
             y_test = np.r_[y_test[:k], y_test[k+1:]]
             y_test_not_scaled = np.r_[y_test_not_scaled[:k], y_test_not_scaled[k+1:]]
+            test_datetime = np.r_[test_datetime[:k], test_datetime[k+1:]]
             k = k - 1
             break
     k = k + 1
@@ -489,15 +484,15 @@ best_neurons = 50
 best_dropoutRate = 0.1
 constraints = 3
 
-epochs_max = 500
+#epochs_max = 500
 batch_size = 4
 #patience = 10
 
+'''
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
-'''
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
 # Using early stopping to train the model
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, 
@@ -516,15 +511,21 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 100
+early_epoch = 40
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
-r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size)
-plt.plot(r.history['loss'], label='loss')
+
+r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size, 
+                  validation_data=(X_test, y_test), validation_freq=5)
+regressor.summary()
+
+plt.plot(range(1,early_epoch+1), r.history['loss'], label='loss')
+plt.plot(np.linspace(0,100,21,endpoint=True)[1:int(int(early_epoch/5)+1)], 
+         r.history['val_loss'], label='val_loss')
 plt.legend()
 plt.show()
 
@@ -537,65 +538,90 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 y_pred_scaled_train = regressor.predict(X_train)
 y_pred_train = sc_flow.inverse_transform(y_pred_scaled_train)
 
-# =============================================================================
-# Plotting the training and test prediction
-# =============================================================================
-test_index = merge.loc[test_startDate : endDate].dropna().index[1:]
-train_index = merge.loc[train_startDate : test_startDate].dropna().index[4:]
-
-plt.plot(test_index, y_pred, label='test pred')
-plt.plot(train_index, y_pred_train, label='train pred')
-#plt.plot(train_index, y_train_not_scaled, label='train')
-#plt.plot(test_index, y_test_not_scaled, label='test')
-plt.legend(loc='best')
-plt.show()
-
 #Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
-#np.savetxt('FRO_KC1_Test_Data.csv',np.c_[y_test_not_scaled,y_pred],fmt='%f',delimiter=',')
+# =============================================================================
+# Plotting the training and test prediction
+# =============================================================================
+plt.plot(test_datetime, y_test_not_scaled, label='test')
+plt.plot(test_datetime, y_pred, label='test pred')#x-label requires turning angle
+#plt.plot(train_datetime, y_pred_train, label='train pred')
+#plt.plot(train_datetime, y_train_not_scaled, label='train')
+#plt.xticks(train_datetime, train_datetime, rotation = 'vertical')
+plt.legend(loc='best')
+plt.show()
 
 # =============================================================================
 # Saving the training results
 # =============================================================================
-regressor.save_weights('./LSTM results/FRO_KC1_6Input')
+# Saving prediction on test set
+np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred],fmt='%s',delimiter=',')
+
+# Saving prediction on train set
+np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
+
+# Saving the LSTM weights
+regressor.save_weights('./LSTM results/'+station+'_4Input')
 
 # Restore the weights
-#regressor.load_weights('./LSTM results/FRO_KC1_6Input')#Skip compiling and fitting process
+#regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # =============================================================================
 # Predicting on 2013 everyday weather data
 # =============================================================================
-weather_2013 = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
-weather_2013 = np.array(weather_2013)
+weather_dense = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
+weather_dense = np.array(weather_dense)
 
-X_test_DT = np.c_[weather_2013[:,1:2], weather_2013[:,3:]]
+X_test_DT = np.c_[weather_dense[:,1:2], weather_dense[:,3:7]]
 melt_test = classifier.predict(X_test_DT)
 
-X_test_DT = np.c_[weather_2013[1:,:], weather_2013[:-1, 3:]]
-X_test = np.c_[weather_2013[1:, 0], weather_2013[1:,3: ], melt_test[1:]]
+weather_dense = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
+weather_dense['Datetime'] = pd.to_datetime(weather_dense['Date/Time'], format='%Y/%m/%d')
+datetime = weather_dense['Datetime']
+
+weather_dense = weather_dense.drop('Date/Time', 1)
+weather_dense = np.array(weather_dense)
+X_test = np.c_[weather_dense[1:, 0], weather_dense[1:,3], weather_dense[1:,6], melt_test[1:]]
 #X_test = np.c_[X_test[:, 0:2], X_test[:, 4], X_test[:, 6:]]
 
 test = np.c_[X_test, np.zeros(len(X_test))]
 scaled_test = scaler.transform(test)
 scaled_test = scaled_test[:, :-1]
 
-#time_step = 10
 print('Below are results for time_step:', time_step)
-X_test = []
+X_scaled = []
+datetime_deNull = []
 for i in range(time_step, len(scaled_test)):
-    #X_test.append(scaled_test[i- time_step+1-gap_days:i+1-gap_days, :])
-    sample_input = []
-    for j in range(0, time_step):
-        sample_input.append(scaled_test[i-gap_days-(time_step-1-j)*avg_days, :])
-    X_test.append(sample_input)
+    if scaled_test[i][-1]>=0:
+        sample_input = []
+        for j in range(0, time_step):
+            sample_input.append(scaled_test[i-gap_days-(time_step-1-j)*avg_days, : ])
+        X_scaled.append(sample_input)
+        datetime_deNull.append(datetime[i])
+X_scaled = np.array(X_scaled)
+test_datetime = np.array(datetime_deNull)
+#8754 samples
 
-X_test = np.array(X_test)
+# Deleting NaNs in samples
+k = 0
+for i in range(0, len(X_scaled)):
+    if k>=len(X_scaled):
+        break
+    for j in X_scaled[k, :, :]:
+        if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]):
+            #print('k:', k)# for testing print out which sample contains NaN
+            X_scaled = np.r_[X_scaled[:k, :, :], X_scaled[k+1:, :, :]]
+            test_datetime = np.r_[test_datetime[:k], test_datetime[k+1:]]
+            k = k - 1
+            break
+    k = k + 1
+# 7808 available for training
 
-y_pred_scaled = regressor.predict(X_test)
+y_pred_scaled = regressor.predict(X_scaled)
 sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('pred_whole_1990-2013_FRO_KC1_Short_Input.csv',y_pred,fmt='%f',delimiter=',')
+np.savetxt('pred_whole_1990-2013_'+station+'_Short_Input.csv',np.c_[test_datetime.reshape(-1, 1),y_pred],fmt='%s',delimiter=',')#test_datetime as x
