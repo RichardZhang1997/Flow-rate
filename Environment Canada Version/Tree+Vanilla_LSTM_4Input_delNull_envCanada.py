@@ -568,7 +568,7 @@ regressor.save_weights('./LSTM results/'+station+'_4Input')
 #regressor.load_weights('./LSTM results/FRO_KC1_4Input')#Skip compiling and fitting process
 
 # =============================================================================
-# Predicting on 2013 everyday weather data
+# Predicting on everyday weather data
 # =============================================================================
 weather_dense = pd.read_csv('Environment Canada\\Weather\\Sparwood\\Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
 weather_dense = np.array(weather_dense)

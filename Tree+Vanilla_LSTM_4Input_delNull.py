@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'EVO_SM1'
+station = 'FRO_KC1_filtered'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -26,11 +26,11 @@ avg_days = 1#here is the average days for decision tree input, later to be chang
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
 seed = 99#seed gave the best prediction result for FRO KC1 station, keep it 26
-flowrate_threshold = 0.05
+flowrate_threshold = 2
 
 train_startDate = '1990-01-01'
-test_startDate = '2012-01-01'
-endDate = '2012-12-31'
+test_startDate = '2013-01-01'
+endDate = '2013-12-31'
 
 # =============================================================================
 flowrate.columns = ['sample_date', 'flow']

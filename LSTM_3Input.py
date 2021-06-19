@@ -273,30 +273,16 @@ plt.show()
 # Saving the training results
 # =============================================================================
 # Saving prediction on test set
-np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred],fmt='%s',delimiter=',')
+np.savetxt(station+'_Test_Data_ctrl_group.csv',np.c_[test_datetime,y_test_not_scaled,y_pred],fmt='%s',delimiter=',')
 
 # Saving prediction on train set
-np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
+np.savetxt(station+'_Train_Data_ctrl_group.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
+# Saving the LSTM weights
 regressor.save_weights('./LSTM results/'+station+'_3Input')
 
 # Restore the weights
 #regressor.load_weights('./LSTM results/'+station+'_3Input')#Skip compiling and fitting process
-
-# =============================================================================
-# Saving the training results
-# =============================================================================
-# Saving prediction on test set
-np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred],fmt='%s',delimiter=',')
-
-# Saving prediction on train set
-np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
-
-# Saving the LSTM weights
-regressor.save_weights('./LSTM results/'+station+'_4Input')
-
-# Restore the weights
-#regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # =============================================================================
 # Predicting on everyday weather data
