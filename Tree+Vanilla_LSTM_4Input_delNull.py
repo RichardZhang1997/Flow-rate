@@ -204,7 +204,6 @@ try:
 except:
     print("ROC doesn't exist")
 
-#springFS_pred_test = y_pred.copy()
 '''
 # =============================================================================
 # Visualization of the tree
@@ -549,8 +548,11 @@ rootMSE(y_test_not_scaled, y_pred)
 # =============================================================================
 plt.plot(test_datetime, y_test_not_scaled, label='test')
 plt.plot(test_datetime, y_pred, label='test pred')#x-label requires turning angle
-#plt.plot(train_datetime, y_pred_train, label='train pred')
-#plt.plot(train_datetime, y_train_not_scaled, label='train')
+plt.legend(loc='best')
+plt.show()
+
+plt.plot(train_datetime, y_pred_train, label='train pred')
+plt.plot(train_datetime, y_train_not_scaled, label='train')
 #plt.xticks(train_datetime, train_datetime, rotation = 'vertical')
 plt.legend(loc='best')
 plt.show()

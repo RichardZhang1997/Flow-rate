@@ -201,7 +201,7 @@ try:
     print(classification_report(np.int32(y_test), y_pred))
 except:
     print("ROC doesn't exist")
-#springFS_pred_test = y_pred.copy()
+
 '''
 # =============================================================================
 # Visualization of the tree
@@ -546,8 +546,11 @@ rootMSE(y_test_not_scaled, y_pred)
 # =============================================================================
 plt.plot(test_datetime, y_test_not_scaled, label='test')
 plt.plot(test_datetime, y_pred, label='test pred')#x-label requires turning angle
-#plt.plot(train_datetime, y_pred_train, label='train pred')
-#plt.plot(train_datetime, y_train_not_scaled, label='train')
+plt.legend(loc='best')
+plt.show()
+
+plt.plot(train_datetime, y_pred_train, label='train pred')
+plt.plot(train_datetime, y_train_not_scaled, label='train')
 #plt.xticks(train_datetime, train_datetime, rotation = 'vertical')
 plt.legend(loc='best')
 plt.show()
@@ -565,7 +568,7 @@ np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_p
 regressor.save_weights('./LSTM results/'+station+'_4Input')
 
 # Restore the weights
-#regressor.load_weights('./LSTM results/FRO_KC1_4Input')#Skip compiling and fitting process
+#regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # =============================================================================
 # Predicting on everyday weather data

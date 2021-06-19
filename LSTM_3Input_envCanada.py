@@ -15,20 +15,20 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'FRO_KC1_filtered'
-flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
+station = '08NG002'
+flowrate = pd.read_csv('Environment Canada\\Flowrate\\'+station+'.csv', usecols=[2, 3], skiprows=[0])
 
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-avg_days = 6
+avg_days = 6#here is the average days for decision tree input, later to be changed to 6 for LSTM
 time_step = 10
-gap_days = 0
-seed = 1
+gap_days = 0#No. of days between the last day of input and the predict date
+seed = 42#seed gave the best prediction result for FRO KC1 station, keep it 26
 
-train_startDate = '1990-01-01'
-test_startDate = '2013-01-01'
-endDate = '2013-12-31'
+train_startDate = '1980-01-01'
+test_startDate = '2019-01-01'
+endDate = '2020-12-31'
 
 # =============================================================================
 # Defining functions
@@ -63,7 +63,7 @@ flowrate['Datetime'] = pd.to_datetime(flowrate['sample_date'], format='%Y/%m/%d'
 flowrate = flowrate.drop('sample_date', 1)
 #print(flowrate.describe())
 
-weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
+weather = pd.read_csv('Environment Canada\\Weather\\Sparwood\\weather_1980-2020_avg_' + str(avg_days) + '.csv')
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
 #Datetime = weather['Datetime'].copy()
@@ -162,7 +162,6 @@ tf.keras.backend.clear_session()
 tf.random.set_seed(seed)
 
 opt = tf.keras.optimizers.Adam(learning_rate=0.001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
-
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
@@ -226,20 +225,20 @@ else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
 
-early_epoch = 100
+early_epoch = 10
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
+
 r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size, 
-                  validation_data=(X_test, y_test), validation_freq=5)
+                  validation_data=(X_test, y_test), validation_freq=1)
 regressor.summary()
 
 plt.plot(range(1,early_epoch+1), r.history['loss'], label='loss')
-plt.plot(np.linspace(0,100,21,endpoint=True)[1:int(int(early_epoch/5)+1)], 
-         r.history['val_loss'], label='val_loss')
+plt.plot(range(1,early_epoch+1), r.history['val_loss'], label='val_loss')
 plt.legend()
 plt.show()
 
@@ -287,7 +286,7 @@ regressor.save_weights('./LSTM results/'+station+'_3Input')
 # =============================================================================
 # Predicting on everyday weather data
 # =============================================================================
-weather_dense = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
+weather_dense = pd.read_csv('Environment Canada\\Weather\\Sparwood\\weather_1980-2020_avg_' + str(avg_days) + '.csv')
 weather_dense['Datetime'] = pd.to_datetime(weather_dense['Date/Time'], format='%Y/%m/%d')
 datetime = weather_dense['Datetime']
 
@@ -335,4 +334,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('pred_whole_1990-2013_'+station+'_3Input.csv',np.c_[test_datetime.reshape(-1, 1),y_pred],fmt='%s',delimiter=',')#test_datetime as x
+np.savetxt('pred_whole_1980-2020_'+station+'_3Input.csv',np.c_[test_datetime.reshape(-1, 1),y_pred],fmt='%s',delimiter=',')#test_datetime as x
