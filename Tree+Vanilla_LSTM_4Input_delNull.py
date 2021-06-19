@@ -514,7 +514,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 40
+early_epoch = 100
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
@@ -571,7 +571,7 @@ regressor.save_weights('./LSTM results/'+station+'_4Input')
 #regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # =============================================================================
-# Predicting on 2013 everyday weather data
+# Predicting on everyday weather data
 # =============================================================================
 weather_dense = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
 weather_dense = np.array(weather_dense)
@@ -627,4 +627,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('pred_whole_1990-2013_'+station+'_Short_Input.csv',np.c_[test_datetime.reshape(-1, 1),y_pred],fmt='%s',delimiter=',')#test_datetime as x
+np.savetxt('pred_whole_1990-2013_'+station+'_4Input.csv',np.c_[test_datetime.reshape(-1, 1),y_pred],fmt='%s',delimiter=',')#test_datetime as x
