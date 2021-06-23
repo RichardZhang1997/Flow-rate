@@ -16,7 +16,7 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = '08NG002'
+station = '08NK022'
 flowrate = pd.read_csv('Environment Canada\\Flowrate\\'+station+'.csv', usecols=[2, 3], skiprows=[0])
 
 # =============================================================================
@@ -25,12 +25,12 @@ flowrate = pd.read_csv('Environment Canada\\Flowrate\\'+station+'.csv', usecols=
 avg_days = 1#here is the average days for decision tree input, later to be changed to 6 for LSTM
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 37#seed gave the best prediction result for FRO KC1 station, keep it 26
-flowrate_threshold = 70
+seed = 19#seed gave the best prediction result for FRO KC1 station, keep it 26
+flowrate_threshold = 5
 
-train_startDate = '1980-01-01'
+train_startDate = '1971/1/1'
 test_startDate = '2019-01-01'
-endDate = '2020-12-31'
+endDate = '2019-12-31'
 
 # =============================================================================
 flowrate.columns = ['sample_date', 'flow']

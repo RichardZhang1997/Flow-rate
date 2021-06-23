@@ -15,7 +15,7 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'FRO_KC1_filtered'
+station = 'EVO_HC1'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -226,13 +226,14 @@ else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
 
-early_epoch = 100
+early_epoch = 85
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
+
 r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size, 
                   validation_data=(X_test, y_test), validation_freq=5)
 regressor.summary()
