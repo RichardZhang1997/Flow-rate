@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'LCO_LC3'
+station = 'EVO_HC1'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -25,12 +25,12 @@ flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 avg_days = 1#here is the average days for decision tree input, later to be changed to 6 for LSTM
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 38#seed gave the best prediction result for FRO KC1 station, keep it 26
-flowrate_threshold = 1
+seed = 73#seed gave the best prediction result for FRO KC1 station, keep it
+flowrate_threshold = 0.8
 
 train_startDate = '1990-01-01'
-test_startDate = '2012-01-01'
-endDate = '2012-12-31'
+test_startDate = '2013-01-01'
+endDate = '2013-12-31'
 
 # =============================================================================
 flowrate.columns = ['sample_date', 'flow']
@@ -203,7 +203,6 @@ try:
     print(classification_report(np.int32(y_test), y_pred))
 except:
     print("ROC doesn't exist")
-
 '''
 # =============================================================================
 # Visualization of the tree
@@ -229,12 +228,12 @@ graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
 # Save the result to png
 try:
     graph.write_png('Visualization\Decision_tree_evaluation\Decision_tree_'+station+'.png')
+    print('Visualization of the decision tree saved successfully.')
 except:
     print('Failed to save the png file, choose another directory.')
 # Display
 Image(graph.create_png())
 '''
-
 # =============================================================================
 # LSTM
 # =============================================================================
@@ -243,7 +242,6 @@ merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge = np.array(merge)
 merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
 merge = pd.DataFrame(merge, index=merge[:, 8])
-
 '''
 # =============================================================================
 # EDA
@@ -262,7 +260,7 @@ feature_names = feature_names[1:-1]
 importances = classifier.feature_importances_#get importance
 indices = np.argsort(importances)[::-1]#get the order of features
 plt.figure(figsize=(12,6))
-plt.title("Feature importance by Decision Tree of LCO LC3 Station")
+plt.title("Feature importance by Decision Tree of "+station+" Station")
 plt.bar(range(len(indices)), importances[indices], color='lightblue',  align="center")
 plt.step(range(len(indices)), np.cumsum(importances[indices]), where='mid', label='Cumulative')
 plt.xticks(range(len(indices)), feature_names[indices], rotation='vertical',fontsize=14)
@@ -279,11 +277,10 @@ plt.ylim([0.0, 1.05])
 plt.plot([0, 1], [0, 1], 'r--')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('ROC Graph of LCO LC3 Station')
+plt.title('ROC Graph of '+station+' Station')
 plt.legend(loc="lower right")
 plt.show()
 '''
-
 # =============================================================================
 # LSTM continue
 # =============================================================================
@@ -437,9 +434,12 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.add(LSTM(units=neurons, return_sequences=False, recurrent_dropout=dropoutRate,
                        kernel_constraint=max_norm(constraints), recurrent_constraint=max_norm(constraints), 
                        bias_constraint=max_norm(constraints)))
-
+    
+    # Adding ANN layer
+    regressor.add(Dense(units=neurons, kernel_initializer='random_normal', activation='linear'))# Output layer do not need specify the activation function
+    
     # Adding output layer
-    regressor.add(Dense(units=1, kernel_initializer='glorot_uniform', activation='relu'))# Output layer do not need specify the activation function
+    regressor.add(Dense(units=1, kernel_initializer='random_normal', activation='relu'))# Output layer do not need specify the activation function
     
     # Compiling the RNN by usign right optimizer and right loss function
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
@@ -482,7 +482,7 @@ for time_step in (3, 7, 15, 30):
 # =============================================================================
 # New LSTM
 # =============================================================================
-best_neurons = 50
+best_neurons = 30
 best_dropoutRate = 0.1
 constraints = 3
 
@@ -513,7 +513,8 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 100
+early_epoch = 71
+validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
@@ -522,11 +523,11 @@ regressor = create_LSTM(neurons=best_neurons,
                         constraints=constraints)
 
 r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size, 
-                  validation_data=(X_test, y_test), validation_freq=5)
+                  validation_data=(X_test, y_test), validation_freq=validation_freq)
 regressor.summary()
 
 plt.plot(range(1,early_epoch+1), r.history['loss'], label='loss')
-plt.plot(np.linspace(0,100,21,endpoint=True)[1:int(int(early_epoch/5)+1)], 
+plt.plot(np.linspace(0,early_epoch,int(early_epoch/validation_freq)+1,endpoint=True)[1:int(int(early_epoch/validation_freq)+1)], 
          r.history['val_loss'], label='val_loss')
 plt.legend()
 plt.show()
@@ -567,9 +568,11 @@ np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred
 np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
 # Saving the LSTM weights
-regressor.save_weights('./LSTM results/'+station+'_4Input')
+regressor.save_weights('./Vanilla_LSTM results/'+station+'_4Input')
+#regressor.save_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # Restore the weights
+#regressor.load_weights('./Vanilla_LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 #regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # =============================================================================

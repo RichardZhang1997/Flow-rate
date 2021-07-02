@@ -15,7 +15,7 @@ import pandas as pd
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'EVO_HC1'
+station = 'LCO_LC3'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -27,8 +27,8 @@ gap_days = 0
 seed = 1
 
 train_startDate = '1990-01-01'
-test_startDate = '2013-01-01'
-endDate = '2013-12-31'
+test_startDate = '2012-01-01'
+endDate = '2012-12-31'
 
 # =============================================================================
 # Defining functions
@@ -185,7 +185,10 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.add(LSTM(units=neurons, return_sequences=False, recurrent_dropout=dropoutRate,
                        kernel_constraint=max_norm(constraints), recurrent_constraint=max_norm(constraints), 
                        bias_constraint=max_norm(constraints)))
-
+    
+    # Adding ANN layer
+    regressor.add(Dense(units=neurons, kernel_initializer='random_normal', activation='linear'))# Output layer do not need specify the activation function
+    
     # Adding output layer
     regressor.add(Dense(units=1, kernel_initializer='glorot_uniform', activation='relu'))# Output layer do not need specify the activation function
     
@@ -226,7 +229,8 @@ else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
 
-early_epoch = 85
+early_epoch = 100
+validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
 print('Training the LSTM without monitoring the validation set...')
@@ -235,11 +239,11 @@ regressor = create_LSTM(neurons=best_neurons,
                         constraints=constraints)
 
 r = regressor.fit(X_train, y_train, epochs=early_epoch, batch_size=batch_size, 
-                  validation_data=(X_test, y_test), validation_freq=5)
+                  validation_data=(X_test, y_test), validation_freq=validation_freq)
 regressor.summary()
 
 plt.plot(range(1,early_epoch+1), r.history['loss'], label='loss')
-plt.plot(np.linspace(0,100,21,endpoint=True)[1:int(int(early_epoch/5)+1)], 
+plt.plot(np.linspace(0,early_epoch,int(early_epoch/validation_freq)+1,endpoint=True)[1:int(int(early_epoch/validation_freq)+1)], 
          r.history['val_loss'], label='val_loss')
 plt.legend()
 plt.show()
@@ -280,10 +284,12 @@ np.savetxt(station+'_Test_Data_ctrl_group.csv',np.c_[test_datetime,y_test_not_sc
 np.savetxt(station+'_Train_Data_ctrl_group.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
 # Saving the LSTM weights
-regressor.save_weights('./LSTM results/'+station+'_3Input')
+regressor.save_weights('./Vanilla_LSTM results/'+station+'_4Input')
+#regressor.save_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # Restore the weights
-#regressor.load_weights('./LSTM results/'+station+'_3Input')#Skip compiling and fitting process
+#regressor.load_weights('./Vanilla_LSTM results/'+station+'_4Input')#Skip compiling and fitting process
+#regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
 
 # =============================================================================
 # Predicting on everyday weather data
