@@ -22,10 +22,11 @@ flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-avg_days = 1#here is the average days for decision tree input, later to be changed to 6 for LSTM
-time_step = 10
+avg_days_DT = 1#here is the average days for decision tree input
+avg_days = 10#average days for LSTM input
+time_step = 6
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 73#seed gave the best prediction result for FRO KC1 station, keep it
+seed = 37#seed gave the best prediction result for FRO KC1 station, keep it
 flowrate_threshold = 0.8
 
 train_startDate = '1990-01-01'
@@ -43,14 +44,14 @@ flowrate = flowrate.drop('sample_date', 1)
 # Missing weather data filling (average weather input enabled)
 # =============================================================================
 try:
-    weather = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
+    weather = pd.read_csv('Weather_filled_avg_' + str(avg_days_DT) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
     weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
     print('Filled weather data loaded successfully')
 except:
     print('Filled weather data not detected, generating...')
     #weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
     #                  usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
-    weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
+    weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days_DT) + '.csv')
     weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
     weather = weather.drop('Date/Time', 1)
     print(weather.describe())
@@ -73,7 +74,7 @@ except:
     weather = weather_copy.drop(columns=['Mean Temp (C)_1', 'Total Rain (mm)_1', 
                                          'Total Snow (cm)_1', 'Total Precip (mm)_1',
                                          'Snow on Grnd (cm)_1'])
-    pd.DataFrame(weather).to_csv('Weather_filled_avg_' + str(avg_days) + '.csv')
+    pd.DataFrame(weather).to_csv('Weather_filled_avg_' + str(avg_days_DT) + '.csv')
     print('Filled weather data saved successfully')
 
 # =============================================================================
@@ -299,7 +300,6 @@ melt_test = classifier.predict(X_test_DT)
 
 ##############################################################################
 # Load not filled weather data (delete NaNs for input of LSTM)
-avg_days = 6
 weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
@@ -434,10 +434,10 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.add(LSTM(units=neurons, return_sequences=False, recurrent_dropout=dropoutRate,
                        kernel_constraint=max_norm(constraints), recurrent_constraint=max_norm(constraints), 
                        bias_constraint=max_norm(constraints)))
-    
+    '''
     # Adding ANN layer
     regressor.add(Dense(units=neurons, kernel_initializer='random_normal', activation='linear'))# Output layer do not need specify the activation function
-    
+    '''
     # Adding output layer
     regressor.add(Dense(units=1, kernel_initializer='random_normal', activation='relu'))# Output layer do not need specify the activation function
     
@@ -445,52 +445,49 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
 
-'''
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
-for time_step in (3, 7, 15, 30):
-    print('Below are results for time_step:', time_step)
-    # Creating the model
-    regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)#Default CV parameters, not that accurate
-    parameters = {'neurons':(5, 50, 100),
-                  'dropoutRate':(0, 0.1, 0.2, 0.3),
-                  'constraints':(3, 99)}
-    
-    clf = GridSearchCV(regressor, parameters, n_jobs=-1, cv=5)
-    clf.fit(X_train, y_train)
-    print('Best score:', clf.best_score_)
-    print('Best parameters:', clf.best_params_)
-    
-    means = clf.cv_results_['mean_test_score']
-    stds = clf.cv_results_['std_test_score']
-    params = clf.cv_results_['params']
-    for mean, stdev, param in zip(means, stds, params):
-        print("%f (%f) with: %r" % (mean, stdev, param))
-    
-    # Predicting on test set
-    regressor = create_LSTM(neurons=clf.best_params_.get('neurons'),
-                            dropoutRate=clf.best_params_.get('dropoutRate'),
-                            constraints=clf.best_params_.get('constraints'))
-    regressor.fit(X_train, y_train, epochs=50, batch_size=8)
-    y_pred_scaled = regressor.predict(X_test)
-    sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
-    sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
-    y_pred = sc_flow.inverse_transform(y_pred_scaled)
-    
-    #Evaluation
-    rootMSE(y_test_not_scaled, y_pred)
-'''
+print('Below are results for time_step:', time_step)
+# Creating the model
+regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)#Default CV parameters, not that accurate
+parameters = {'neurons':(5, 50, 100),
+              'dropoutRate':(0, 0.1, 0.2, 0.3),
+              'constraints':(3, 99)}
+
+clf = GridSearchCV(regressor, parameters, n_jobs=-1, cv=5)
+clf.fit(X_train, y_train)
+print('Best score:', clf.best_score_)
+print('Best parameters:', clf.best_params_)
+
+means = clf.cv_results_['mean_test_score']
+stds = clf.cv_results_['std_test_score']
+params = clf.cv_results_['params']
+for mean, stdev, param in zip(means, stds, params):
+    print("%f (%f) with: %r" % (mean, stdev, param))
+
+# Predicting on test set
+regressor = create_LSTM(neurons=clf.best_params_.get('neurons'),
+                        dropoutRate=clf.best_params_.get('dropoutRate'),
+                        constraints=clf.best_params_.get('constraints'))
+regressor.fit(X_train, y_train, epochs=50, batch_size=8)
+y_pred_scaled = regressor.predict(X_test)
+sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
+sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
+y_pred = sc_flow.inverse_transform(y_pred_scaled)
+
+#Evaluation
+rootMSE(y_test_not_scaled, y_pred)
+
 # =============================================================================
 # New LSTM
 # =============================================================================
-best_neurons = 30
-best_dropoutRate = 0.1
+best_neurons = 50
+best_dropoutRate = 0
 constraints = 3
-
-#epochs_max = 500
 batch_size = 4
-#patience = 10
 
 '''
+epochs_max = 500
+patience = 10
 # Creating the model
 regressor = create_LSTM(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
@@ -513,7 +510,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 71
+early_epoch = 80
 validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
@@ -534,6 +531,12 @@ plt.show()
 
 sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
+
+# Sensitivity test
+#X_test[:,:,1] = 0.8*X_test[:,:,1]#Temp+-20%
+#X_test[:,:,2] = 0.8*X_test[:,:,2]#Precip+-20%
+#X_test[:,:,3] = np.ones(X_test[:,:,3].shape)#SF all ones
+#X_test[:,:,3] = np.zeros(X_test[:,:,3].shape)#SF all zeros
 
 y_pred_scaled = regressor.predict(X_test)
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
