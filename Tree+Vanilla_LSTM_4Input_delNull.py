@@ -16,18 +16,18 @@ import matplotlib.pyplot as plt
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'EVO_HC1'
+station = 'FRO_KC1_filtered'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
 # Choosing parameters
 # =============================================================================
 avg_days_DT = 1#here is the average days for decision tree input
-avg_days = 10#average days for LSTM input
-time_step = 6
-gap_days = 0#No. of days between the last day of input and the predict date
+avg_days = 6#average days for LSTM input
+time_step = 10
+gap_days = 15#No. of days between the last day of input and the predict date
 seed = 37#seed gave the best prediction result for FRO KC1 station, keep it
-flowrate_threshold = 0.8
+flowrate_threshold = 2
 
 train_startDate = '1990-01-01'
 test_startDate = '2013-01-01'
@@ -241,7 +241,7 @@ Image(graph.create_png())
 flowrate.index = range(0, len(flowrate))
 merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge = np.array(merge)
-merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
+merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#Switch melt with flowrate columns
 merge = pd.DataFrame(merge, index=merge[:, 8])
 '''
 # =============================================================================
@@ -257,7 +257,7 @@ corr = merge.drop(8,1).drop(9,1).apply(lambda x:x.astype(float)).corr()
 sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names)
 
 #Features importance analysis of decision tree
-feature_names = feature_names[1:-1]
+feature_names = np.append(feature_names[1], feature_names[3:7])
 importances = classifier.feature_importances_#get importance
 indices = np.argsort(importances)[::-1]#get the order of features
 plt.figure(figsize=(12,6))
@@ -308,7 +308,7 @@ print('Non-filled and averaged weather data loaded successfully')
 flowrate.index = range(0, len(flowrate))
 merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
 merge = np.array(merge)
-merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#将melt与flowrate列互换
+merge = np.c_[merge[:, :9], merge[:, 10], merge[:, 9]]#Switch melt with flowrate columns
 merge = pd.DataFrame(merge, index=merge[:, 8])
 
 test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values
@@ -376,7 +376,7 @@ for i in range(0, len(X_train)):
         break
     for j in X_train[k, :, :]:
         if np.isnan(j[0]) or np.isnan(j[1]) or np.isnan(j[2]):
-            #print('k:', k)# for testing print out which sample contains NaN
+            #print('k:', k)# for testing, print out which sample contains NaN
             X_train = np.r_[X_train[:k, :, :], X_train[k+1:, :, :]]
             y_train = np.r_[y_train[:k], y_train[k+1:]]
             y_train_not_scaled = np.r_[y_train_not_scaled[:k], y_train_not_scaled[k+1:]]
@@ -411,7 +411,7 @@ import tensorflow as tf
 tf.keras.backend.clear_session()
 tf.random.set_seed(seed)
 
-opt = tf.keras.optimizers.Adam(learning_rate=0.001)#默认值0.001，先用默认值确定其他超参，learningRate和epoch一起在下面CV_Training确定
+opt = tf.keras.optimizers.Adam(learning_rate=0.001)#default lr=0.001
 #@tf.function
 def create_LSTM(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
@@ -445,6 +445,7 @@ def create_LSTM(neurons, dropoutRate, constraints):
     regressor.compile(loss='mean_squared_error', optimizer=opt, metrics=['mse'])#adam to be changed
     return regressor
 
+# Grid search and cross-validation for each grid point
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 print('Below are results for time_step:', time_step)
 # Creating the model
@@ -474,17 +475,24 @@ sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
-#Evaluation
+# Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
 # =============================================================================
 # New LSTM
 # =============================================================================
-best_neurons = 50
-best_dropoutRate = 0
-constraints = 3
-batch_size = 4
+'''
+# Setting hyperparameters automatically from grid-searching results
+best_neurons = clf.best_params_.get('neurons')
+best_dropoutRate = clf.best_params_.get('dropoutRate')
+constraints = clf.best_params_.get('constraints')
+'''
+# Setting hyperparameters manually
+best_neurons = 100
+best_dropoutRate = 0.2
+constraints = 99
 
+batch_size = 4
 '''
 epochs_max = 500
 patience = 10
@@ -497,7 +505,7 @@ regressor = create_LSTM(neurons=best_neurons,
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, 
                                             min_delta=0, restore_best_weights=True)#change patience number
 r = regressor.fit(X_train.astype('float64'), y_train.astype('float64'), epochs=epochs_max, batch_size=batch_size, 
-              callbacks=[early_stop_callback], validation_split=0.2)#转换成在validation set 上面验证
+              callbacks=[early_stop_callback], validation_split=0.2)#validate on 20% validation set
 regressor.summary()
 # Plot loss per iteration
 plt.plot(r.history['loss'], label='loss')
@@ -544,7 +552,7 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 y_pred_scaled_train = regressor.predict(X_train)
 y_pred_train = sc_flow.inverse_transform(y_pred_scaled_train)
 
-#Evaluation
+# Evaluation
 rootMSE(y_test_not_scaled, y_pred)
 
 # =============================================================================
@@ -571,12 +579,12 @@ np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred
 np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
 # Saving the LSTM weights
-regressor.save_weights('./Vanilla_LSTM results/'+station+'_4Input')
-#regressor.save_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
+#regressor.save_weights('./Vanilla_LSTM results/'+station+'_4Input')
+regressor.save_weights('./Vanilla_LSTM results/'+station+'_gap='+str(gap_days)+'_4Input')
 
 # Restore the weights
 #regressor.load_weights('./Vanilla_LSTM results/'+station+'_4Input')#Skip compiling and fitting process
-#regressor.load_weights('./LSTM results/'+station+'_4Input')#Skip compiling and fitting process
+#regressor.load_weights('./Vanilla_LSTM results/'+station+'_gap='+str(gap_days)+'_4Input')
 
 # =============================================================================
 # Predicting on everyday weather data
