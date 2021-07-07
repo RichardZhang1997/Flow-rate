@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'FRO_KC1_filtered'
+station = 'EVO_HC1'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -25,9 +25,9 @@ flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 avg_days_DT = 1#here is the average days for decision tree input
 avg_days = 6#average days for LSTM input
 time_step = 10
-gap_days = 15#No. of days between the last day of input and the predict date
-seed = 37#seed gave the best prediction result for FRO KC1 station, keep it
-flowrate_threshold = 2
+gap_days = 0#No. of days between the last day of input and the predict date
+seed = 91#seed gave the best prediction result for FRO KC1 station, keep it
+flowrate_threshold = 0.8
 
 train_startDate = '1990-01-01'
 test_startDate = '2013-01-01'
@@ -518,7 +518,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 80
+early_epoch = 100
 validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
@@ -541,10 +541,15 @@ sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 
 # Sensitivity test
-#X_test[:,:,1] = 0.8*X_test[:,:,1]#Temp+-20%
+X_test[:,:,1] = 0.8*X_test[:,:,1]#Temp+-20%
 #X_test[:,:,2] = 0.8*X_test[:,:,2]#Precip+-20%
 #X_test[:,:,3] = np.ones(X_test[:,:,3].shape)#SF all ones
 #X_test[:,:,3] = np.zeros(X_test[:,:,3].shape)#SF all zeros
+
+X_train[:,:,1] = 0.8*X_train[:,:,1]#Temp+-20%
+#X_train[:,:,2] = 0.8*X_train[:,:,2]#Precip+-20%
+#X_train[:,:,3] = np.ones(X_train[:,:,3].shape)#SF all ones
+#X_train[:,:,3] = np.zeros(X_train[:,:,3].shape)#SF all zeros
 
 y_pred_scaled = regressor.predict(X_test)
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
@@ -579,8 +584,8 @@ np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred
 np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
 # Saving the LSTM weights
-#regressor.save_weights('./Vanilla_LSTM results/'+station+'_4Input')
-regressor.save_weights('./Vanilla_LSTM results/'+station+'_gap='+str(gap_days)+'_4Input')
+regressor.save_weights('./Vanilla_LSTM results/'+station+'_4Input')
+#regressor.save_weights('./Vanilla_LSTM results/'+station+'_gap='+str(gap_days)+'_4Input')
 
 # Restore the weights
 #regressor.load_weights('./Vanilla_LSTM results/'+station+'_4Input')#Skip compiling and fitting process
