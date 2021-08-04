@@ -23,7 +23,7 @@ flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 # Choosing parameters
 # =============================================================================
 avg_days_DT = 1#here is the average days for decision tree input
-avg_days = 6#average days for LSTM input
+avg_days = 6#average days for GRU input
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
 seed = 91#seed gave the best prediction result for FRO KC1 station, keep it
@@ -236,7 +236,7 @@ except:
 Image(graph.create_png())
 '''
 # =============================================================================
-# LSTM
+# GRU
 # =============================================================================
 flowrate.index = range(0, len(flowrate))
 merge = pd.merge(weather, flowrate, on=('Datetime'), how='left')
@@ -283,7 +283,7 @@ plt.legend(loc="lower right")
 plt.show()
 '''
 # =============================================================================
-# LSTM continue
+# GRU continue
 # =============================================================================
 test = merge.loc[test_startDate : endDate].drop(8,1).drop(2,1).values#drop date and datetime columns
 train = merge.loc[train_startDate : test_startDate].drop(8,1).drop(2,1).values#Changed
@@ -299,7 +299,7 @@ melt_train = classifier.predict(X_DT)
 melt_test = classifier.predict(X_test_DT)
 
 ##############################################################################
-# Load not filled weather data (delete NaNs for input of LSTM)
+# Load not filled weather data (delete NaNs for input of GRU)
 weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
@@ -401,9 +401,9 @@ for i in range(0, len(X_test)):
     k = k + 1
 # 22 available for testing
 
-# Constructing a LSTM
+# Constructing a GRU
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM
+from tensorflow.keras.layers import Dense, GRU
 from tensorflow.keras.constraints import max_norm
 import tensorflow as tf
 
@@ -411,27 +411,27 @@ import tensorflow as tf
 tf.keras.backend.clear_session()
 tf.random.set_seed(seed)
 
-opt = tf.keras.optimizers.Adam(learning_rate=0.001)#default lr=0.001
+opt = tf.keras.optimizers.Adam(learning_rate=0.0002)#default lr=0.001
 #@tf.function
-def create_LSTM(neurons, dropoutRate, constraints):
+def create_GRU(neurons, dropoutRate, constraints):
     # Ignore the WARNING here, numpy version problem
     
     # Initializing the RNN
     regressor = Sequential()
     #regressor.add(Dropout(rate=0.2))
     '''
-    # Adding the first layer of LSTM and some Dropout regularization (to prevent overfitting)
-    regressor.add(LSTM(units=neurons, return_sequences=True, recurrent_dropout=dropoutRate, 
+    # Adding the first layer of GRU and some Dropout regularization (to prevent overfitting)
+    regressor.add(GRU(units=neurons, return_sequences=True, recurrent_dropout=dropoutRate, 
                        kernel_constraint=max_norm(constraints), recurrent_constraint=max_norm(constraints), 
                        bias_constraint=max_norm(constraints)))
     
-    # Adding a second LSTM layer and some Dropout regulariazation
-    regressor.add(LSTM(units=neurons, return_sequences=True, recurrent_dropout=dropoutRate, 
+    # Adding a second GRU layer and some Dropout regulariazation
+    regressor.add(GRU(units=neurons, return_sequences=True, recurrent_dropout=dropoutRate, 
                        kernel_constraint=max_norm(constraints), recurrent_constraint=max_norm(constraints), 
                        bias_constraint=max_norm(constraints)))
     '''
-    # Adding the last LSTM layer and some Dropout regulariazation
-    regressor.add(LSTM(units=neurons, return_sequences=False, recurrent_dropout=dropoutRate,
+    # Adding the last GRU layer and some Dropout regulariazation
+    regressor.add(GRU(units=neurons, return_sequences=False, recurrent_dropout=dropoutRate,
                        kernel_constraint=max_norm(constraints), recurrent_constraint=max_norm(constraints), 
                        bias_constraint=max_norm(constraints)))
     '''
@@ -447,9 +447,9 @@ def create_LSTM(neurons, dropoutRate, constraints):
 
 # Grid search and cross-validation for each grid point
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
-print('Below are results for time_step:', time_step)
+#print('Below are results for time_step:', time_step)
 # Creating the model
-regressor = KerasRegressor(build_fn=create_LSTM, epochs=50, batch_size=8)#Default CV parameters, not that accurate
+regressor = KerasRegressor(build_fn=create_GRU, epochs=50, batch_size=8)#Default CV parameters, not that accurate
 parameters = {'neurons':(5, 50, 100),
               'dropoutRate':(0, 0.1, 0.2, 0.3),
               'constraints':(3, 99)}
@@ -466,7 +466,7 @@ for mean, stdev, param in zip(means, stds, params):
     print("%f (%f) with: %r" % (mean, stdev, param))
 
 # Predicting on test set
-regressor = create_LSTM(neurons=clf.best_params_.get('neurons'),
+regressor = create_GRU(neurons=clf.best_params_.get('neurons'),
                         dropoutRate=clf.best_params_.get('dropoutRate'),
                         constraints=clf.best_params_.get('constraints'))
 regressor.fit(X_train, y_train, epochs=50, batch_size=8)
@@ -479,7 +479,7 @@ y_pred = sc_flow.inverse_transform(y_pred_scaled)
 rootMSE(y_test_not_scaled, y_pred)
 
 # =============================================================================
-# New LSTM
+# New GRU
 # =============================================================================
 '''
 # Setting hyperparameters automatically from grid-searching results
@@ -489,7 +489,7 @@ constraints = clf.best_params_.get('constraints')
 '''
 # Setting hyperparameters manually
 best_neurons = 100
-best_dropoutRate = 0.2
+best_dropoutRate = 0.3
 constraints = 99
 
 batch_size = 4
@@ -497,7 +497,7 @@ batch_size = 4
 epochs_max = 500
 patience = 10
 # Creating the model
-regressor = create_LSTM(neurons=best_neurons,
+regressor = create_GRU(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
 #r = regressor.fit(X_train, y_train, epochs=50, batch_size=8)
@@ -522,8 +522,8 @@ early_epoch = 100
 validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
-print('Training the LSTM without monitoring the validation set...')
-regressor = create_LSTM(neurons=best_neurons,
+print('Training the GRU without monitoring the validation set...')
+regressor = create_GRU(neurons=best_neurons,
                         dropoutRate=best_dropoutRate,
                         constraints=constraints)
 
@@ -541,13 +541,13 @@ sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 
 # Sensitivity test
-#X_test[:,:,1] = 0.8*X_test[:,:,1]#Temp+-20%
-#X_test[:,:,2] = 0.8*X_test[:,:,2]#Precip+-20%
+#X_test[:,:,1] = 1.2*X_test[:,:,1]#Temp+-20%
+#X_test[:,:,2] = 1.2*X_test[:,:,2]#Precip+-20%
 #X_test[:,:,3] = np.ones(X_test[:,:,3].shape)#SF all ones
 #X_test[:,:,3] = np.zeros(X_test[:,:,3].shape)#SF all zeros
 
-#X_train[:,:,1] = 0.8*X_train[:,:,1]#Temp+-20%
-#X_train[:,:,2] = 0.8*X_train[:,:,2]#Precip+-20%
+#X_train[:,:,1] = 1.2*X_train[:,:,1]#Temp+-20%
+#X_train[:,:,2] = 1.2*X_train[:,:,2]#Precip+-20%
 #X_train[:,:,3] = np.ones(X_train[:,:,3].shape)#SF all ones
 #X_train[:,:,3] = np.zeros(X_train[:,:,3].shape)#SF all zeros
 
@@ -578,20 +578,21 @@ plt.show()
 # Saving the training results
 # =============================================================================
 # Saving prediction on test set
-np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred],fmt='%s',delimiter=',')
+np.savetxt(station+'_GRU_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred],fmt='%s',delimiter=',')
 
 # Saving prediction on train set
-np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
+np.savetxt(station+'_GRU_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
-# Saving the LSTM weights
-regressor.save_weights('./Vanilla_LSTM results/'+station+'_4Input')
+# Saving the GRU weights
+regressor.save_weights('./Vanilla_GRU results/'+station+'_4Input')
 
 # Restore the weights
-#regressor.load_weights('./Vanilla_LSTM results/'+station+'_4Input')#Skip compiling and fitting process
+#regressor.load_weights('./Vanilla_GRU results/'+station+'_4Input')#Skip compiling and fitting process
 
 
-#regressor.save_weights('./Vanilla_LSTM results/'+station+'_gap='+str(gap_days)+'_4Input')
-#regressor.load_weights('./Vanilla_LSTM results/'+station+'_gap='+str(gap_days)+'_4Input')
+# With gap_days
+#regressor.save_weights('./Vanilla_GRU results/'+station+'_gap='+str(gap_days)+'_4Input')
+#regressor.load_weights('./Vanilla_GRU results/'+station+'_gap='+str(gap_days)+'_4Input')
 
 # =============================================================================
 # Predicting on everyday weather data
