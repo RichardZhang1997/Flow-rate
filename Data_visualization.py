@@ -15,7 +15,7 @@ import pandas as pd
 
 ###############################################################################
 # Loading datasets
-#flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
+flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
@@ -25,7 +25,7 @@ import pandas as pd
 #flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
 #flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
-flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
+#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
 ###############################################################################
 weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
                       usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
@@ -61,6 +61,34 @@ weather.groupby('Month')['Total Snow (cm)'].mean().plot.bar(title='Average Total
 weather.groupby('Month')['Total Precip (mm)'].mean().plot.bar(title='Average Total Precip (mm) by Month')
 
 weather.groupby('Month')['Snow on Grnd (cm)'].mean().plot.bar(title='Average Snow on Grnd (cm) by Month')
+
+mean_temp = weather.groupby('Month')['Mean Temp (°C)'].mean()
+std_temp = weather.groupby('Month')['Mean Temp (°C)'].std()
+mean_precip = weather.groupby('Month')['Total Precip (mm)'].mean()
+std_precip = weather.groupby('Month')['Total Precip (mm)'].std()
+months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+# monthly averaged precipitation and temperature plot
+plt.rcParams['figure.figsize'] = (15.0,5.0)
+fig = plt.figure()
+#画柱形图
+ax1 = fig.add_subplot(111)
+#ax1.bar(months, mean_precip,alpha=.7,color='g', label='Precipitation')
+ax1.errorbar(x=months,y=mean_precip,yerr=std_precip,alpha=.7,color='g',label='Precipitation',fmt='o:',mfc='wheat',mec='salmon',capsize=5)
+ax1.set_ylabel('Monthly Averaged Total Precipitation (mm)',fontsize='12')
+plt.legend(loc='upper left')
+#ax1.set_title("数据统计",fontsize='20')
+#画折线图 
+ax2 = ax1.twinx()   #组合图必须加这个
+ax2.plot(months, mean_temp, color='red', linewidth=2, linestyle='-', label='Temperature')
+ax2.set_ylabel('Monthly Averaged Temperature (℃)', fontsize='12')
+plt.legend(loc='upper right')
+plt.show()
+'''
+————————————————
+版权声明：本文为CSDN博主「随风而逝*」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/weixin_41869644/article/details/89318515
+'''
 
 #Flowrate
 flowrate.dropna(inplace=True)

@@ -15,10 +15,12 @@ import matplotlib.pyplot as plt
 from scipy import optimize
 from sklearn.metrics import r2_score
 
-station = 'FRO_KC1'
+station = 'FRO_HC1'
 regression = pd.read_csv('./Visualization/Data/'+station+'_data.csv')
+#regression = pd.read_csv('./Visualization/Data/'+station+'_data_new.csv')#only FRO HC1 is better for new one
 regression_norm = pd.read_csv('./Visualization/Data/'+station+'_data_norm.csv')
-threshold = 2
+#regression_norm = pd.read_csv('./Visualization/Data/'+station+'_data_norm_new.csv')
+threshold = 1.8
 #regression Index(['Date', 'Measured', 'Output_withSF', 'Output_withoutSF'], dtype='object')
 
 fontdict_exmt = {'size':12, 'color':'r', 'family':'Times New Roman'}
@@ -53,8 +55,10 @@ y3_ctrl = slope_1_ctrl*x + bias_1_ctrl# (x, y3) is the line fitting plot
 # plotting 
 #fontdict = {'size':16, 'color':'k', 'family':'Times New Roman'}
 fig, ax = plt.subplots(figsize=(6,6), dpi=200)
-plt.scatter(x, y_exmt, edgecolors=None, c='r', s=30, marker='+')
-plt.scatter(x, y_ctrl, edgecolors=None, c='g', s=30, marker='x')
+#plt.scatter(x, y_exmt, edgecolors=None, c='r', s=30, marker='s')# edgecolors=None, c='r', s=30, marker='^'
+#plt.scatter(x, y_ctrl, edgecolors=None, c='g', s=30, marker='^')# edgecolors=None, c='g', s=30, marker='s'
+ax.plot(x, y_exmt, '^', markerfacecolor='none', ms=6, markeredgecolor='red', label='With SF')
+ax.plot(x, y_ctrl, 's', markerfacecolor='none', ms=6, markeredgecolor='green', label='Without SF')
 ax.plot(x2, y2, color='k', linewidth=1.5, linestyle='--')
 ax.plot(x, y3_exmt, color='r', linewidth=2, linestyle='-')
 ax.plot(x, y3_ctrl, color='g', linewidth=2, linestyle='-')
@@ -74,10 +78,10 @@ ax.tick_params(left=True, bottom=True, direction='in', labelsize=14)
 # adding the titile
 ax.set_title(station, titlefontdic, pad=14)
 #ax.set_title()
-ax.text(-1.8, 5.7, 'With SF', fontdict=fontdict_exmt)
-ax.text(-0.4, 5.7, 'Without SF', fontdict=fontdict_ctrl)
-ax.text(-1.8, 5.3, r'$R=$'+str(round(np.sqrt(C_exmt),3)), fontdict=fontdict_exmt)
-ax.text(-0.4, 5.3, r'$R=$'+str(round(np.sqrt(C_ctrl),3)), fontdict=fontdict_ctrl)
+#ax.text(-1.8, 5.7, 'With SF', fontdict=fontdict_exmt)
+#ax.text(-0.4, 5.7, 'Without SF', fontdict=fontdict_ctrl)
+ax.text(0.5, 5.6, r'$R=$'+str(round(np.sqrt(C_exmt),3)), fontdict=fontdict_exmt)
+ax.text(0.5, 5.2, r'$R=$'+str(round(np.sqrt(C_ctrl),3)), fontdict=fontdict_ctrl)
 
 #ax.text(-1.8, 4.9, r'$Slope=$'+str(round(slope_1_exmt,3)), fontdict=fontdict_exmt)
 #ax.text(0.0, 4.9, r'$Slope=$'+str(round(slope_1_ctrl,3)), fontdict=fontdict_ctrl)
@@ -85,8 +89,10 @@ ax.text(-0.4, 5.3, r'$R=$'+str(round(np.sqrt(C_ctrl),3)), fontdict=fontdict_ctrl
 #ax.text(0.0, 4.9, r'$Slope=$'+str(0.841), fontdict=fontdict_ctrl)
 
 #ax.text(0.91, 0.92, '(a)', transform = ax.transAxes, fontdict=text_font, zorder=4)
-#ax.text(0.91, 0.92, '(b)', transform = ax.transAxes, fontdict=text_font, zorder=4)
-ax.text(0.91, 0.92, '(c)', transform = ax.transAxes, fontdict=text_font, zorder=4)
+ax.text(0.91, 0.92, '(b)', transform = ax.transAxes, fontdict=text_font, zorder=4)
+#ax.text(0.91, 0.92, '(c)', transform = ax.transAxes, fontdict=text_font, zorder=4)
+
+plt.legend()
 plt.show()
 
 # =============================================================================
@@ -123,9 +129,9 @@ plt.scatter(x1, y1, edgecolors=None, c='r', s=15, marker='s', label='Measured')
 plt.plot(x2, y2,'b-', lw=1.0, label="Model Output")#Line
 plt.axvline(x=datetime.date(2013,1,1), ls='--', c='black', lw=1.0)
 plt.ylabel('Flow Rate ($\mathregular{m^{3}}$/s)',fontdict=font1)#$\mathregular{min^{-1}}$label的格式,^{-1}为上标
-plt.xlabel('Year',fontdict=font1)
+plt.xlabel('Time',fontdict=font1)
 plt.legend(loc="upper left",scatterpoints=1,prop=font1,shadow=True,frameon=False)#添加图例,
-ax.set_xlim(x1[0], datetime.date(2014,1,1))
+ax.set_xlim(datetime.date(1992,1,1), datetime.date(2014,1,1))
 ax.set_ylim(0.0, 5.0)
 # Major ticks every 12 months.
 fmt_whole_year = MonthLocator(interval=12)
@@ -151,10 +157,10 @@ plt.rcParams['font.sans-serif']=['Times New Roman']
 plt.title(station,fontdict=font2, pad=14)#Title
 #plt.scatter(x1, y1, edgecolors=None, c='b', s=15, marker='o', label='Measured')
 plt.plot(x1, y1,'b-', lw=1.0, marker='o', label="Model Output")#Line
-plt.plot([x1[0], x1[-1]], [threshold,threshold],'--', c='black', lw=1.0, label="Threshold")#Dash line
+plt.plot([x1[0], x1[-1]], [threshold,threshold],'--', c='black', lw=1.0, label="SF Threshold")#Dash line
 plt.ylabel('Flow Rate ($\mathregular{m^{3}}$/s)',fontdict=font1)#$\mathregular{min^{-1}}$label的格式,^{-1}为上标
-plt.xlabel('Year',fontdict=font1)
-ax.set_xlim(x1[0], datetime.date(2013,12,31))
+plt.xlabel('Time',fontdict=font1)
+ax.set_xlim(datetime.date(1992,1,1), datetime.date(2014,1,1))
 ax.set_ylim(0.0, 5.0)
 # Major ticks every 12 months.
 fmt_whole_year = MonthLocator(interval=12)
@@ -190,22 +196,22 @@ plt.rcParams['axes.unicode_minus'] = False#使用上标小标小一字号
 plt.rcParams['font.sans-serif']=['Times New Roman']
 plt.title(station,fontdict=font2, pad=14)#Title
 #plt.scatter(x1, y1, edgecolors=None, c='b', s=15, marker='o', label='Measured')
-plt.plot(x, y_T_plus,'--', color='red', lw=1.0, label="T+20%")#Line
+plt.plot(x, y_T_plus,'--', color='red', lw=1.0, label="Temperatrue+20%")#Line
 plt.plot(x, y_base,'-', color='black', lw=1.0, label="Baseline")#Line
-plt.plot(x, y_T_minus,'--', color='blue', lw=1.0, label="T-20%")#Line
+plt.plot(x, y_T_minus,'-.', color='blue', lw=1.0, label="Temperatrue-20%")#Line
 plt.ylabel('Flow Rate ($\mathregular{m^{3}}$/s)',fontdict=font1)#$\mathregular{min^{-1}}$label的格式,^{-1}为上标
 plt.xlabel('Time',fontdict=font1)
 plt.legend(loc="upper left",scatterpoints=1,prop=font1,shadow=True,frameon=False)#添加图例,
 #ax.set_xlim(x[0], x[-1])
-ax.set_ylim(-0.2, 8.0)
+ax.set_ylim(-0.2, 4.0)
 # Major ticks every 1 months.
 fmt_whole_month = MonthLocator(interval=1)
 ax.xaxis.set_major_locator(fmt_whole_month)
 date_form = DateFormatter("%Y-%m")#only display year here, capital means 4 digits
 ax.xaxis.set_major_formatter(date_form)
-plt.text(0.91, 0.92, '(a)', fontdict=text_font, transform = ax.transAxes)
+#plt.text(0.91, 0.92, '(a)', fontdict=text_font, transform = ax.transAxes)
 #plt.text(0.91, 0.92, '(b)', fontdict=text_font, transform = ax.transAxes)
-#plt.text(0.91, 0.92, '(c)', fontdict=text_font, transform = ax.transAxes)
+plt.text(0.91, 0.92, '(c)', fontdict=text_font, transform = ax.transAxes)
 plt.show()
 
 fig, ax = plt.subplots(figsize=(7,5), dpi=200)
@@ -213,22 +219,22 @@ plt.rcParams['axes.unicode_minus'] = False#使用上标小标小一字号
 plt.rcParams['font.sans-serif']=['Times New Roman']
 plt.title(station,fontdict=font2, pad=14)#Title
 #plt.scatter(x1, y1, edgecolors=None, c='b', s=15, marker='o', label='Measured')
-plt.plot(x, y_P_plus,'--', color='maroon', lw=1.0, label="P+20%")#Line
+plt.plot(x, y_P_plus,'--', color='maroon', lw=1.0, label="Precipitation+20%")#Line
 plt.plot(x, y_base,'-', color='black', lw=1.0, label="Baseline")#Line
-plt.plot(x, y_P_minus,'--', color='green', lw=1.0, label="P-20%")#Line
+plt.plot(x, y_P_minus,'-.', color='green', lw=1.0, label="Precipitation-20%")#Line
 plt.ylabel('Flow Rate ($\mathregular{m^{3}}$/s)',fontdict=font1)#$\mathregular{min^{-1}}$label的格式,^{-1}为上标
 plt.xlabel('Time',fontdict=font1)
 plt.legend(loc="upper left",scatterpoints=1,prop=font1,shadow=True,frameon=False)#添加图例,
 #ax.set_xlim(x[0], x[-1])
-ax.set_ylim(-0.2, 8.0)
+ax.set_ylim(-0.2, 4.0)
 # Major ticks every 1 months.
 fmt_whole_month = MonthLocator(interval=1)
 ax.xaxis.set_major_locator(fmt_whole_month)
 date_form = DateFormatter("%Y-%m")#only display year here, capital means 4 digits
 ax.xaxis.set_major_formatter(date_form)
-plt.text(0.91, 0.92, '(d)', fontdict=text_font, transform = ax.transAxes)
+#`plt.text(0.91, 0.92, '(d)', fontdict=text_font, transform = ax.transAxes)
 #plt.text(0.91, 0.92, '(e)', fontdict=text_font, transform = ax.transAxes)
-#plt.text(0.91, 0.92, '(f)', fontdict=text_font, transform = ax.transAxes)
+plt.text(0.91, 0.92, '(f)', fontdict=text_font, transform = ax.transAxes)
 plt.show()
 
 # =============================================================================

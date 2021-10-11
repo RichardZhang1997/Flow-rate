@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'EVO_HC1'
+station = 'FRO_KC1_filtered'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -27,7 +27,7 @@ avg_days = 6#average days for LSTM input
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
 seed = 91#seed gave the best prediction result for FRO KC1 station, keep it
-flowrate_threshold = 0.8
+flowrate_threshold = 0.7
 
 train_startDate = '1990-01-01'
 test_startDate = '2013-01-01'
@@ -54,7 +54,6 @@ except:
     weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days_DT) + '.csv')
     weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
     weather = weather.drop('Date/Time', 1)
-    print(weather.describe())
     monthly_mean = pd.DataFrame()
     monthly_mean['Mean Temp (C)_1'] = weather.groupby('Month')['Mean Temp (C)'].mean()
     monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
@@ -76,7 +75,7 @@ except:
                                          'Snow on Grnd (cm)_1'])
     pd.DataFrame(weather).to_csv('Weather_filled_avg_' + str(avg_days_DT) + '.csv')
     print('Filled weather data saved successfully')
-
+#print(weather.describe())
 # =============================================================================
 # Generating melting data
 # =============================================================================
@@ -143,6 +142,8 @@ def predict_test(X_scaled_test, classifier):
 def accuracy_print_conf(y_test, y_pred):
     from sklearn.metrics import confusion_matrix, accuracy_score
     conf_matrix = confusion_matrix(y_test.astype('int'), y_pred.astype('int'))
+    #separately print out confusion matrix
+    #tn, fp, fn, tp = confusion_matrix(y_test.astype('int'), y_pred.astype('int')).ravel()
     print('The confusion matrix is:\n', conf_matrix)
     accuracy = accuracy_score(y_test.astype('int'), y_pred.astype('int'))
     print('The accuracy is: %2.2f' % accuracy)
@@ -166,7 +167,7 @@ np.random.seed(seed)
 from sklearn.model_selection import GridSearchCV
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_'+station+'.joblib')
+    classifier = load('DecisionTreeForLSTM_new'+station+'.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -188,7 +189,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_'+station+'.joblib')#To be changed
+    dump(classifier, 'DecisionTreeForLSTM_new'+station+'.joblib')#To be changed
     print('Decision tree training result saved')
 
 # Prediction
@@ -541,12 +542,12 @@ sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 
 # Sensitivity test
-#X_test[:,:,1] = 0.8*X_test[:,:,1]#Temp+-20%
+#X_test[:,:,1] = 1.2*X_test[:,:,1]#Temp+-20%
 #X_test[:,:,2] = 0.8*X_test[:,:,2]#Precip+-20%
 #X_test[:,:,3] = np.ones(X_test[:,:,3].shape)#SF all ones
 #X_test[:,:,3] = np.zeros(X_test[:,:,3].shape)#SF all zeros
 
-#X_train[:,:,1] = 0.8*X_train[:,:,1]#Temp+-20%
+#X_train[:,:,1] = 1.2*X_train[:,:,1]#Temp+-20%
 #X_train[:,:,2] = 0.8*X_train[:,:,2]#Precip+-20%
 #X_train[:,:,3] = np.ones(X_train[:,:,3].shape)#SF all ones
 #X_train[:,:,3] = np.zeros(X_train[:,:,3].shape)#SF all zeros

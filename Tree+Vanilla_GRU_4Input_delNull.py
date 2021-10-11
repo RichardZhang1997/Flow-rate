@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'EVO_HC1'
+station = 'FRO_HC1'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -26,8 +26,8 @@ avg_days_DT = 1#here is the average days for decision tree input
 avg_days = 6#average days for GRU input
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 91#seed gave the best prediction result for FRO KC1 station, keep it
-flowrate_threshold = 0.8
+seed = 99#seed gave the best prediction result for FRO KC1 station, keep it
+flowrate_threshold = 2
 
 train_startDate = '1990-01-01'
 test_startDate = '2013-01-01'
@@ -488,7 +488,7 @@ best_dropoutRate = clf.best_params_.get('dropoutRate')
 constraints = clf.best_params_.get('constraints')
 '''
 # Setting hyperparameters manually
-best_neurons = 100
+best_neurons = 50
 best_dropoutRate = 0.3
 constraints = 99
 
@@ -518,7 +518,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 100
+early_epoch = 60
 validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
@@ -541,12 +541,12 @@ sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 
 # Sensitivity test
-#X_test[:,:,1] = 1.2*X_test[:,:,1]#Temp+-20%
+X_test[:,:,1] = 1.2*X_test[:,:,1]#Temp+-20%
 #X_test[:,:,2] = 1.2*X_test[:,:,2]#Precip+-20%
 #X_test[:,:,3] = np.ones(X_test[:,:,3].shape)#SF all ones
 #X_test[:,:,3] = np.zeros(X_test[:,:,3].shape)#SF all zeros
 
-#X_train[:,:,1] = 1.2*X_train[:,:,1]#Temp+-20%
+X_train[:,:,1] = 1.2*X_train[:,:,1]#Temp+-20%
 #X_train[:,:,2] = 1.2*X_train[:,:,2]#Precip+-20%
 #X_train[:,:,3] = np.ones(X_train[:,:,3].shape)#SF all ones
 #X_train[:,:,3] = np.zeros(X_train[:,:,3].shape)#SF all zeros
