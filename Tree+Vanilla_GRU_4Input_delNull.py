@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # =============================================================================
 # Loading datasets
 # =============================================================================
-station = 'FRO_HC1'
+station = 'EVO_HC1'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 # =============================================================================
@@ -26,8 +26,8 @@ avg_days_DT = 1#here is the average days for decision tree input
 avg_days = 6#average days for GRU input
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 99#seed gave the best prediction result for FRO KC1 station, keep it
-flowrate_threshold = 2
+seed = 91#seed gave the best prediction result for FRO KC1 station, keep it
+flowrate_threshold = 0.7
 
 train_startDate = '1990-01-01'
 test_startDate = '2013-01-01'
@@ -44,17 +44,22 @@ flowrate = flowrate.drop('sample_date', 1)
 # Missing weather data filling (average weather input enabled)
 # =============================================================================
 try:
+    #2 choose 1
     weather = pd.read_csv('Weather_filled_avg_' + str(avg_days_DT) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
+    #weather = pd.read_csv('Weather_long_filled_avg_' + str(avg_days_DT) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
+    
     weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
     print('Filled weather data loaded successfully')
 except:
     print('Filled weather data not detected, generating...')
     #weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
     #                  usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+    #2 choose 1
     weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days_DT) + '.csv')
+    #weather = pd.read_csv('weather_1980-2020_avg_' + str(avg_days_DT) + '.csv')
+    
     weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
     weather = weather.drop('Date/Time', 1)
-    print(weather.describe())
     monthly_mean = pd.DataFrame()
     monthly_mean['Mean Temp (C)_1'] = weather.groupby('Month')['Mean Temp (C)'].mean()
     monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
@@ -74,9 +79,12 @@ except:
     weather = weather_copy.drop(columns=['Mean Temp (C)_1', 'Total Rain (mm)_1', 
                                          'Total Snow (cm)_1', 'Total Precip (mm)_1',
                                          'Snow on Grnd (cm)_1'])
+    #2 choose 1
     pd.DataFrame(weather).to_csv('Weather_filled_avg_' + str(avg_days_DT) + '.csv')
+    #pd.DataFrame(weather).to_csv('Weather_long_filled_avg_' + str(avg_days_DT) + '.csv')
+    
     print('Filled weather data saved successfully')
-
+#print(weather.describe())
 # =============================================================================
 # Generating melting data
 # =============================================================================
@@ -253,8 +261,9 @@ feature_names = np.append(feature_names,'Flowrate\n(m^3/s)')
 
 #Correlation analysis
 import seaborn as sns
-corr = merge.drop(8,1).drop(9,1).apply(lambda x:x.astype(float)).corr()
+corr = merge.drop(8,1).drop(9,1).apply(lambda x:x.astype(float)).corr()#default: pearson coef.
 sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names)
+#sns.heatmap(corr,xticklabels=feature_names,yticklabels=feature_names, cmap='RdYlGn', center=0, annot=True)#advanced
 
 #Features importance analysis of decision tree
 feature_names = np.append(feature_names[1], feature_names[3:7])
@@ -488,8 +497,8 @@ best_dropoutRate = clf.best_params_.get('dropoutRate')
 constraints = clf.best_params_.get('constraints')
 '''
 # Setting hyperparameters manually
-best_neurons = 50
-best_dropoutRate = 0.3
+best_neurons = 100
+best_dropoutRate = 0.2
 constraints = 99
 
 batch_size = 4
@@ -518,7 +527,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 60
+early_epoch = 100
 validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
@@ -541,12 +550,12 @@ sc_flow = MinMaxScaler(feature_range=(0, 1), copy=True)
 sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 
 # Sensitivity test
-X_test[:,:,1] = 1.2*X_test[:,:,1]#Temp+-20%
+#X_test[:,:,1] = 1.2*X_test[:,:,1]#Temp+-20%
 #X_test[:,:,2] = 1.2*X_test[:,:,2]#Precip+-20%
 #X_test[:,:,3] = np.ones(X_test[:,:,3].shape)#SF all ones
 #X_test[:,:,3] = np.zeros(X_test[:,:,3].shape)#SF all zeros
 
-X_train[:,:,1] = 1.2*X_train[:,:,1]#Temp+-20%
+#X_train[:,:,1] = 1.2*X_train[:,:,1]#Temp+-20%
 #X_train[:,:,2] = 1.2*X_train[:,:,2]#Precip+-20%
 #X_train[:,:,3] = np.ones(X_train[:,:,3].shape)#SF all ones
 #X_train[:,:,3] = np.zeros(X_train[:,:,3].shape)#SF all zeros
@@ -584,10 +593,10 @@ np.savetxt(station+'_GRU_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_
 np.savetxt(station+'_GRU_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
 # Saving the GRU weights
-regressor.save_weights('./Vanilla_GRU results/'+station+'_4Input')
+#regressor.save_weights('./Vanilla_GRU results/'+station+'_4Input')
 
 # Restore the weights
-#regressor.load_weights('./Vanilla_GRU results/'+station+'_4Input')#Skip compiling and fitting process
+regressor.load_weights('./Vanilla_GRU results/'+station+'_4Input')#Skip compiling and fitting process
 
 
 # With gap_days
@@ -597,13 +606,17 @@ regressor.save_weights('./Vanilla_GRU results/'+station+'_4Input')
 # =============================================================================
 # Predicting on everyday weather data
 # =============================================================================
-weather_dense = pd.read_csv('Weather_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1).drop('Datetime', 1)
+weather_dense = pd.read_csv('Weather_long_filled_avg_' + str(avg_days) + '.csv').drop('Num', 1)
+test_datetime = np.array(weather_dense['Datetime'])
+weather_dense.drop('Datetime', 1, inplace=True)
 weather_dense = np.array(weather_dense)
 
 X_test_DT = np.c_[weather_dense[:,1:2], weather_dense[:,3:7]]
 melt_test = classifier.predict(X_test_DT)
+#Saving SF predicted results
+np.savetxt('pred_SF_whole_1980-2020_'+station+'.csv',np.c_[test_datetime, melt_test],fmt='%s',delimiter=',')#test_datetime as x
 
-weather_dense = pd.read_csv('weather_1990-2013_avg_' + str(avg_days) + '.csv')
+weather_dense = pd.read_csv('weather_1980-2020_avg_' + str(avg_days) + '.csv')
 weather_dense['Datetime'] = pd.to_datetime(weather_dense['Date/Time'], format='%Y/%m/%d')
 datetime = weather_dense['Datetime']
 
@@ -651,4 +664,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('pred_whole_1990-2013_'+station+'_4Input.csv',np.c_[test_datetime,y_pred],fmt='%s',delimiter=',')#test_datetime as x
+np.savetxt('pred_whole_1980-2020_'+station+'_4Input_GRU.csv',np.c_[test_datetime,y_pred],fmt='%s',delimiter=',')#test_datetime as x
