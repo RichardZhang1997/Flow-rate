@@ -28,15 +28,15 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-station = 'FRO_HC1'
+station = 'FRO_KC1_filtered'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 avg_days_DT = 1#here is the average days for decision tree input
 avg_days = 6#average days for LSTM input
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
-seed = 99#seed gave the best prediction result for FRO KC1 station, keep it
-flowrate_threshold = 1.8
+seed = 91#seed gave the best prediction result for FRO KC1 station, keep it
+flowrate_threshold = 1.2
 recurrent_type = 'LSTM'#choose 'LSTM' OR 'GRU'
 
 train_startDate = '1990-01-01'
@@ -559,9 +559,9 @@ best_dropoutRate = clf.best_params_.get('dropoutRate')
 constraints = clf.best_params_.get('constraints')
 '''
 # Setting hyperparameters manually
-best_neurons = 50
-best_dropoutRate = 0.2
-constraints = 3
+best_neurons = 100
+best_dropoutRate = 0.3
+constraints = 99
 
 batch_size = 4
 '''
@@ -589,7 +589,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 100
+early_epoch = 200
 validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
@@ -641,6 +641,7 @@ plt.show()
 
 print('epoch         loss         val_loss')
 print(np.c_[range(1,early_epoch+1), loss_history])
+
 #choose LSTM or GRU save history loss
 if recurrent_type == 'GRU':
     np.savetxt('./Vanilla_GRU results/'+station+'/5Input_flow_history.csv',np.c_[range(1,early_epoch+1), loss_history],fmt='%s',delimiter=',')
@@ -694,10 +695,10 @@ np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred
 np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
 # Restore the weights
-best_epoch = 97
+best_epoch = 128#SEED=28 for FRO KC1
 #choose load direction
 if recurrent_type == 'GRU':
-    regressor.load_weights('./Vanilla_LSTM results/'+station+'/4Input_flow_'+str(best_epoch))#Skip compiling and fitting process
+    regressor.load_weights('./Vanilla_GRU results/'+station+'/4Input_flow_'+str(best_epoch))#Skip compiling and fitting process
 else:
     regressor.load_weights('./Vanilla_LSTM results/'+station+'/4Input_flow_'+str(best_epoch))#Skip compiling and fitting process
 

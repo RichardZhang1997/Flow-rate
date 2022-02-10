@@ -37,6 +37,13 @@ flowrate = flowrate.drop('sample_date', 1)
 weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
 weather = weather.drop('Date/Time', 1)
 
+fontdict_exmt = {'size':12, 'color':'r', 'family':'Times New Roman'}
+fontdict_ctrl = {'size':12, 'color':'g', 'family':'Times New Roman'}
+titlefontdic = {'size':16, 'color':'k', 'family':'Times New Roman'}
+text_font = {'size':'22', 'color':'black', 'weight':'bold', 'family':'Times New Roman'}
+font1={'family': 'Times New Roman', 'weight': 'light', 'size': 12}
+font2={'family': 'Times New Roman', 'weight': 'light', 'size': 16}
+
 # =============================================================================
 # EDA and Visualization
 # =============================================================================
@@ -67,28 +74,32 @@ std_temp = weather.groupby('Month')['Mean Temp (°C)'].std()
 mean_precip = weather.groupby('Month')['Total Precip (mm)'].mean()
 std_precip = weather.groupby('Month')['Total Precip (mm)'].std()
 months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+month_days = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 # monthly averaged precipitation and temperature plot
-plt.rcParams['figure.figsize'] = (15.0,5.0)
+plt.rcParams['figure.figsize'] = (12.0,4.0)
+plt.rcParams['figure.dpi'] = 300
+plt.rcParams['xtick.labelsize'] = 16
+plt.rcParams['ytick.labelsize'] = 16
+plt.rcParams['font.sans-serif']=['Times New Roman']
+plt.rcParams['lines.markersize']=8
 fig = plt.figure()
 #画柱形图
 ax1 = fig.add_subplot(111)
-#ax1.bar(months, mean_precip,alpha=.7,color='g', label='Precipitation')
-ax1.errorbar(x=months,y=mean_precip,yerr=std_precip,alpha=.7,color='g',label='Precipitation',fmt='o:',mfc='wheat',mec='salmon',capsize=5)
-ax1.set_ylabel('Monthly Averaged Total Precipitation (mm)',fontsize='12')
-plt.legend(loc='upper left')
+ax1.bar(months, mean_precip*month_days,alpha=.7,color='grey', label='Precipitation',width=0.6)
+#ax1.errorbar(x=months,y=mean_precip,yerr=std_precip,alpha=.7,color='g',label='Precipitation',fmt='o:',mfc='wheat',mec='salmon',capsize=5)
+ax1.set_ylim(0,100)
+ax1.set_ylabel('Monthly average total precipitation (mm)',fontdict=font2)
+plt.legend(loc='upper left',frameon=False,prop=font2)
 #ax1.set_title("数据统计",fontsize='20')
 #画折线图 
 ax2 = ax1.twinx()   #组合图必须加这个
-ax2.plot(months, mean_temp, color='red', linewidth=2, linestyle='-', label='Temperature')
-ax2.set_ylabel('Monthly Averaged Temperature (℃)', fontsize='12')
-plt.legend(loc='upper right')
+ax2.plot(months, mean_temp, color='black', linewidth=1, linestyle='-', marker='s', label='Temperature')
+#ax2.scatter(months, mean_temp, linewidth=2, color='red', label='Temperature')
+ax2.set_ylabel('Monthly average temperature (℃)',fontdict=font2)
+ax2.set_ylim(-10,20)
+plt.legend(loc='upper right',frameon=False,prop=font2)
 plt.show()
-'''
-————————————————
-版权声明：本文为CSDN博主「随风而逝*」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
-原文链接：https://blog.csdn.net/weixin_41869644/article/details/89318515
-'''
 
 #Flowrate
 flowrate.dropna(inplace=True)
