@@ -28,7 +28,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 # =============================================================================
 # Choosing parameters
 # =============================================================================
-station = 'FRO_KC1_filtered'
+station = 'EVO_HC1'
 flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
 
 avg_days_DT = 1#here is the average days for decision tree input
@@ -36,7 +36,7 @@ avg_days = 6#average days for LSTM input
 time_step = 10
 gap_days = 0#No. of days between the last day of input and the predict date
 seed = 91#seed gave the best prediction result for FRO KC1 station, keep it
-flowrate_threshold = 1.2#1.2, 1.7, and 0.7 for FRO_KC1, FRO_HC1, and EVO_HC1
+flowrate_threshold = 0.7#1.2, 1.7, and 0.7 for FRO_KC1, FRO_HC1, and EVO_HC1
 recurrent_type = 'LSTM'#choose 'LSTM' OR 'GRU'
 
 train_startDate = '1990-01-01'
@@ -179,22 +179,25 @@ def rootMSE(y_test, y_pred):
     return rmse
 
 # =============================================================================
-# Decision Tree
+# Random Forest
 # =============================================================================
 # Fixing a seed
 np.random.seed(seed)
 
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_new'+station+'.joblib')
-    print('Trained decision tree result loaded successfully')
+    classifier = load('RFForLSTM_new'+station+'.joblib')
+    print('Trained random forest result loaded successfully')
 except:
     print('No training result detected, training...')
-    from sklearn.tree import DecisionTreeClassifier
-    classifier = DecisionTreeClassifier()# Use 'entropy' instead of 'gini'
-    
+    from sklearn.ensemble import RandomForestClassifier
+    #feature_name=[weather.columns[1], weather.columns[3], weather.columns[4], 
+    #              weather.columns[5], weather.columns[6], weather.columns[7]]
+    classifier = RandomForestClassifier()
     # Grid searching
+    #from sklearn.model_selection import GridSearchCV
     parameters = {'criterion':('gini', 'entropy'),
+                  'n_estimators':(50, 100, 10),
                   'min_weight_fraction_leaf':(0.1, 0.01)}
     clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
     clf.fit(X, y.astype('int'))
@@ -202,17 +205,17 @@ except:
     print('Best parameters:', clf.best_params_)
     
     # Training the classifier with best hyperparameters
-    classifier = DecisionTreeClassifier(criterion=clf.best_params_.get('criterion'),
-                                        min_weight_fraction_leaf=clf.best_params_.get('min_weight_fraction_leaf'),
-                                        random_state=seed)
+    classifier = RandomForestClassifier(criterion=clf.best_params_.get('criterion'),
+                                        n_estimators=clf.best_params_.get('n_estimators'),
+                                        min_weight_fraction_leaf=clf.best_params_.get('min_weight_fraction_leaf'))
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_new'+station+'.joblib')#To be changed
-    print('Decision tree training result saved')
+    dump(classifier, 'RFForLSTM_new'+station+'.joblib')#To be changed
+    print('Random forest training result saved')
 
 # Prediction
-print('For DecisionTreeClassifier: ')
+print('For RandomForestClassifier: ')
 y_pred = predict_test(X_test, classifier)
 accuracy = accuracy_print_conf(y_test, y_pred)
 
@@ -220,7 +223,7 @@ accuracy = accuracy_print_conf(y_test, y_pred)
 try:
     from sklearn.metrics import roc_auc_score, classification_report
     dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
-    print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
+    print ("Random Forest AUC = %2.2f" % dt_roc_auc)
     print(classification_report(np.int32(y_test), y_pred))
 except:
     print("ROC doesn't exist")
@@ -288,6 +291,8 @@ plt.step(range(len(indices)), np.cumsum(importances[indices]), where='mid', labe
 plt.xticks(range(len(indices)), feature_names[indices], rotation='vertical',fontsize=14)
 plt.xlim([-1, len(indices)])
 plt.show()
+print('feature names:', feature_names[indices])
+print('importances:', importances[indices])
 
 #ROC plot
 from sklearn.metrics import roc_curve
@@ -589,7 +594,7 @@ if early_stop_callback.stopped_epoch == 0:
 else:
     early_epoch = early_stop_callback.stopped_epoch
 '''
-early_epoch = 200
+early_epoch = 100
 validation_freq = 1
 
 print('The training stopped at epoch:', early_epoch)
@@ -695,7 +700,7 @@ np.savetxt(station+'_Test_Data.csv',np.c_[test_datetime,y_test_not_scaled,y_pred
 np.savetxt(station+'_Train_Data.csv',np.c_[train_datetime,y_train_not_scaled,y_pred_train],fmt='%s',delimiter=',')
 
 # Restore the weights
-best_epoch = 128#SEED=28 for FRO KC1
+best_epoch = 76#SEED=28 for FRO KC1
 #choose load direction
 if recurrent_type == 'GRU':
     regressor.load_weights('./Vanilla_GRU results/'+station+'/4Input_flow_'+str(best_epoch))#Skip compiling and fitting process
@@ -713,7 +718,7 @@ weather_dense = np.array(weather_dense)
 X_test_DT = np.c_[weather_dense[:,1:2], weather_dense[:,3:7]]
 melt_test = classifier.predict(X_test_DT)
 #Saving SF predicted results
-np.savetxt('pred_SF_whole_1980-2020_'+station+'.csv',np.c_[test_datetime, melt_test],fmt='%s',delimiter=',')#test_datetime as x
+np.savetxt('pred_SF_by_RF_whole_1980-2020_'+station+'.csv',np.c_[test_datetime, melt_test],fmt='%s',delimiter=',')#test_datetime as x
 
 weather_dense = pd.read_csv('weather_1980-2020_avg_' + str(avg_days) + '.csv')
 weather_dense['Datetime'] = pd.to_datetime(weather_dense['Date/Time'], format='%Y/%m/%d')
@@ -763,4 +768,4 @@ sc_flow.fit_transform(np.array(y_train_not_scaled).reshape(-1, 1))
 y_pred = sc_flow.inverse_transform(y_pred_scaled)
 
 #Saving predicted results
-np.savetxt('pred_whole_1980-2020_'+station+'_4Input.csv',np.c_[test_datetime,y_pred],fmt='%s',delimiter=',')#test_datetime as x
+np.savetxt('pred_by_RF_whole_1980-2020_'+station+'_4Input.csv',np.c_[test_datetime,y_pred],fmt='%s',delimiter=',')#test_datetime as x

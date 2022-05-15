@@ -6,27 +6,27 @@ Created on Fri Apr 23 08:03:14 2021
 """
 
 import os
-os.chdir("C:\\MyFile\\Study\\Graduate\\Marko Mine\\Flowrate")
+os.chdir("D:\\Study\\Marko Mine\\Flowrate")
 
 # Importing the libraries
 import numpy as np
 #import matplotlib.pyplot as plt
 import pandas as pd
 
-###############################################################################
-# Loading datasets
-flowrate = pd.read_csv('FRO_KC1_.csv', usecols=[2, 10])
-#flowrate = pd.read_csv('FRO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_CC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_PC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_HC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('GHO_SC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_WLC_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('LCO_LC3_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_BC1_.csv', usecols=[2, 3])
-##flowrate = pd.read_csv('EVO_EC1_.csv', usecols=[2, 3])
-#flowrate = pd.read_csv('EVO_SM1_.csv', usecols=[2, 3])
-###############################################################################
+from sklearn.model_selection import GridSearchCV
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import roc_auc_score, classification_report
+
+station = 'FRO_KC1_filtered'
+flowrate = pd.read_csv(station+'_.csv', usecols=[2, 3])
+
+avg_days_DT = 1#here is the average days for decision tree input
+flowrate_threshold = 1.2#1.2, 1.7, and 0.7 for FRO_KC1, FRO_HC1, and EVO_HC1
+seed = 1029
+
+train_startDate = '1990-01-01'
+test_startDate = '2013-01-01'
+endDate = '2013-12-31'
 
 flowrate.columns = ['sample_date', 'flow']
 # Converting date string to datetime
@@ -39,18 +39,24 @@ flowrate = flowrate.drop('sample_date', 1)
 # Missing weather data filling
 # =============================================================================
 try:
-    weather = pd.read_csv('Weather_filled_avg_3.csv').drop('Num', 1)
+    #2 choose 1
+    weather = pd.read_csv('Weather_filled_avg_' + str(avg_days_DT) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
+    #weather = pd.read_csv('Weather_long_filled_avg_' + str(avg_days_DT) + '.csv').drop('Num', 1)#weather data for the tree must NOT be averaged
+    
     weather['Datetime'] = pd.to_datetime(weather['Datetime'], format='%Y/%m/%d')
     print('Filled weather data loaded successfully')
 except:
     print('Filled weather data not detected, generating...')
-    weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
-                      usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+    #weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
+    #                  usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+    #2 choose 1
+    weather = pd.read_csv('weather_1990-2013_avg_' + str(avg_days_DT) + '.csv')
+    #weather = pd.read_csv('weather_1980-2020_avg_' + str(avg_days_DT) + '.csv')
+    
     weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
     weather = weather.drop('Date/Time', 1)
-    print(weather.describe())
     monthly_mean = pd.DataFrame()
-    monthly_mean['Mean Temp (°C)_1'] = weather.groupby('Month')['Mean Temp (°C)'].mean()
+    monthly_mean['Mean Temp (C)_1'] = weather.groupby('Month')['Mean Temp (C)'].mean()
     monthly_mean['Total Rain (mm)_1'] = weather.groupby('Month')['Total Rain (mm)'].mean()
     monthly_mean['Total Snow (cm)_1'] = weather.groupby('Month')['Total Snow (cm)'].mean()
     monthly_mean['Total Precip (mm)_1'] = weather.groupby('Month')['Total Precip (mm)'].mean()
@@ -61,20 +67,22 @@ except:
     monthly_mean.index = range(1, 13)#for 12 months, the name of index must be removed
     weather_copy = pd.merge(weather, monthly_mean, on=('Month'), how='left')
 
-    for i in ['Mean Temp (°C)', 'Total Rain (mm)', 'Total Snow (cm)', 'Total Precip (mm)', 'Snow on Grnd (cm)']:
+    for i in ['Mean Temp (C)', 'Total Rain (mm)', 'Total Snow (cm)', 'Total Precip (mm)', 'Snow on Grnd (cm)']:
         for j in range(0, len(weather_copy)):
             if weather_copy[i].isnull()[j]:
                 weather_copy.loc[j, i] = weather_copy[i+'_1'][j]
-    weather = weather_copy.drop(columns=['Mean Temp (°C)_1', 'Total Rain (mm)_1', 
+    weather = weather_copy.drop(columns=['Mean Temp (C)_1', 'Total Rain (mm)_1', 
                                          'Total Snow (cm)_1', 'Total Precip (mm)_1',
                                          'Snow on Grnd (cm)_1'])
-    pd.DataFrame(weather).to_csv('Weather_filled.csv')
+    #2 choose 1
+    pd.DataFrame(weather).to_csv('Weather_filled_avg_' + str(avg_days_DT) + '.csv')
+    #pd.DataFrame(weather).to_csv('Weather_long_filled_avg_' + str(avg_days_DT) + '.csv')
+    
     print('Filled weather data saved successfully')
-
+#print(weather.describe())
 # =============================================================================
 # Generating melting data
 # =============================================================================
-flowrate_threshold = 2
 melt = np.zeros(len(flowrate['flow']))
 j = 0
 for i in flowrate['flow']:
@@ -107,24 +115,23 @@ X = day0.copy()
 # Transfer to dataframe and seperate to train, valid and test set
 X = pd.DataFrame(X, index=X[:, 8])
 X = X.drop(2,1)
-X.dropna(inplace=True)
+X.dropna(inplace=True)#just for double-check there won't be nan to feed the DT
 
-X_test = X.loc['2013-01-01':'2013-12-31'].values
-X = X.loc['1990-01-01':'2013-01-01'].values#Changed
-datetime = X[:, 7]
+X_test = X.loc[test_startDate : endDate].values
+X = X.loc[train_startDate : test_startDate].values#Changed
+#datetime = X[:, 7]
 y = X[:, 8]
 
-X = X[:, 1:7]
+X = X[:, 1:6]
 #X = np.c_[X[:, 1:7], X[:, 9:]]#for more than 2 days
 #eliminate 'year' from the inputX = X[:, 1:8] 
 
 # =============================================================================
 # Transforming test set
 # =============================================================================
-datetime_test = X_test[:, 7]
 y_test = X_test[:, 8]
 
-X_test = X_test[:, 1:7]
+X_test = X_test[:, 1:6]
 #X_test = np.c_[X_test[:, 1:7], X_test[:, 9:]]#for more than 2 days
 #X = X[:, 1:8] eliminate 'year' from the input
 
@@ -155,16 +162,81 @@ def rootMSE(y_test, y_pred):
     return rmse
 
 # Fixing a seed
-seed = 1029
 np.random.seed(seed)
-from sklearn.model_selection import GridSearchCV
-from sklearn.tree import DecisionTreeClassifier
+
+# =============================================================================
+# Random Forest
+# =============================================================================
+
+try:
+    from joblib import load
+    classifier = load('RFForLSTM_new'+station+'.joblib')
+    print('Trained decision tree result loaded successfully')
+except:
+    print('No training result detected, training...')
+    from sklearn.ensemble import RandomForestClassifier
+    #feature_name=[weather.columns[1], weather.columns[3], weather.columns[4], 
+    #              weather.columns[5], weather.columns[6], weather.columns[7]]
+    classifier = RandomForestClassifier()
+    # Grid searching
+    #from sklearn.model_selection import GridSearchCV
+    parameters = {'criterion':('gini', 'entropy'),
+                  'n_estimators':(50, 100, 10),
+                  'min_weight_fraction_leaf':(0.1, 0.01)}
+    clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
+    clf.fit(X, y.astype('int'))
+    print('Best score:', clf.best_score_)
+    print('Best parameters:', clf.best_params_)
+    
+    # Training the classifier with best hyperparameters
+    classifier = RandomForestClassifier(criterion=clf.best_params_.get('criterion'),
+                                        n_estimators=clf.best_params_.get('n_estimators'),
+                                        min_weight_fraction_leaf=clf.best_params_.get('min_weight_fraction_leaf'))
+    classifier.fit(X, y.astype('int'))
+    
+    from joblib import dump
+    dump(classifier, 'RFForLSTM_new'+station+'.joblib')#To be changed
+    print('Decision tree training result saved')
+'''
+#fixed hps
+from sklearn.ensemble import RandomForestClassifier
+classifier = RandomForestClassifier(criterion = 'gini',
+                                    n_estimators = 10,
+                                    min_weight_fraction_leaf = 0.1)
+classifier.fit(X, y.astype('int'))
+'''
+# Prediction
+print('For Random Forest Classifier: ')
+y_pred = predict_test(X_test, classifier)
+accuracy = accuracy_print_conf(y_test, y_pred)
+
+#Indicator calculating
+dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
+print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
+print(classification_report(np.int32(y_test), y_pred))
+'''
+The confusion matrix is:
+ [[12  2]
+ [ 0  9]]
+The accuracy is: 0.91
+Decision Tree AUC = 0.93
+              precision    recall  f1-score   support
+
+           0       1.00      0.86      0.92        14
+           1       0.82      1.00      0.90         9
+
+    accuracy                           0.91        23
+   macro avg       0.91      0.93      0.91        23
+weighted avg       0.93      0.91      0.91        23
+'''
+
 # =============================================================================
 # XGBoosting
 # =============================================================================
+'''
 try:
     from joblib import load
-    classifier = load('XGBForLSTM_FRO_KC1_avg_3_day0.joblib')
+    classifier = load('XGBForLSTM_new'+station+'.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -173,7 +245,7 @@ except:
     #              weather.columns[5], weather.columns[6], weather.columns[7]]
     #classifier = xgb.XGBClassifier(max_depth=5, n_estimators=10, silent=True, objective='binary:hinge', feature_names=feature_name)
     classifier = xgb.XGBClassifier(max_depth=5, n_estimators=10, silent=True, objective='binary:hinge')
-    classifier.fit(X, y)
+    classifier.fit(X, y.astype('int'))
     # Grid searching
     #from sklearn.model_selection import GridSearchCV
     parameters = {'n_estimators':(5, 10, 50),
@@ -188,12 +260,21 @@ except:
                                    n_estimators=clf.best_params_.get('n_estimators'),
                                    silent=True,
                                    objective='binary:hinge', #feature_names=feature_name, 
-                                   random_state=seed)
+                                   random_state=seed, use_label_encoder =False)
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'XGBForLSTM_FRO_KC1_avg_3_day0.joblib')#To be changed
+    dump(classifier, ''XGBForLSTM_new'+station+'.joblib')#To be changed
     print('Decision tree training result saved')
+'''
+#fixed hps
+import xgboost as xgb
+classifier = xgb.XGBClassifier(max_depth=3,
+                               n_estimators=50,
+                               #silent=True,
+                               objective='binary:hinge', #feature_names=feature_name, 
+                               random_state=seed, use_label_encoder =False)
+classifier.fit(X, y.astype('int'))
 
 # Prediction
 print('For XGBoosting Classifier: ')
@@ -201,45 +282,34 @@ y_pred = predict_test(X_test, classifier)
 accuracy = accuracy_print_conf(y_test, y_pred)
 
 #Indicator calculating
-from sklearn.metrics import roc_auc_score, classification_report
 dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
 print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
 print(classification_report(np.int32(y_test), y_pred))
 
 '''
 Day 0:
-Best score (CV): 0.8289473684210525
-Best parameters: {'max_depth': 3, 'n_estimators': 50}
 The confusion matrix is:
- [[15  0]
- [ 4  4]]
-The accuracy is (test set): 0.8260869565217391
+ [[12  2]
+ [ 1  8]]
+The accuracy is: 0.87
+Decision Tree AUC = 0.87
+              precision    recall  f1-score   support
 
-Day 1:
-Best score (CV): 0.8131578947368421
-Best parameters: {'max_depth': 3, 'n_estimators': 50}
-The confusion matrix is:
- [[15  0]
- [ 4  4]]
-The accuracy is: 0.8260869565217391
-Decision Tree AUC = 0.75
+           0       0.92      0.86      0.89        14
+           1       0.80      0.89      0.84         9
 
-Day 2:
-Best score (CV): 0.7973684210526317
-Best parameters: {'max_depth': 3, 'n_estimators': 50}
-The confusion matrix is:
- [[15  0]
- [ 4  4]]
-The accuracy is: 0.8260869565217391
-Decision Tree AUC = 0.75
+    accuracy                           0.87        23
+   macro avg       0.86      0.87      0.87        23
+weighted avg       0.87      0.87      0.87        23
 '''
 
 # =============================================================================
 # AdaBoosting
 # =============================================================================
+'''
 try:
     from joblib import load
-    classifier = load('AdaBForLSTM_FRO_KC1_avg_3_day0.joblib')
+    classifier = load('AdaBForLSTM_new'+station+'.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
@@ -253,7 +323,7 @@ except:
     # Grid searching
     #from sklearn.model_selection import GridSearchCV
     parameters = {'learning_rate':(0.08, 0.8),
-                  'n_estimators':(50, 100, 300)}
+                  'n_estimators':(50, 100, 10)}
     clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
     clf.fit(X, y.astype('int'))
     print('Best score:', clf.best_score_)
@@ -269,47 +339,45 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'AdaBForLSTM_FRO_KC1_avg_3_day0.joblib')#To be changed
+    dump(classifier, 'AdaBForLSTM_new'+station+'.joblib')#To be changed
     print('Decision tree training result saved')
-
+'''
+#fixed hps
+from sklearn.ensemble import AdaBoostClassifier
+classifier = AdaBoostClassifier(algorithm='SAMME.R',
+                                base_estimator=DecisionTreeClassifier(criterion='gini',
+                                                     min_weight_fraction_leaf=0.1),
+                                learning_rate = 0.08,
+                                n_estimators = 10,
+                                random_state=seed)
+classifier.fit(X, y.astype('int'))
 # Prediction
 print('For AdaBoosting Classifier: ')
 y_pred = predict_test(X_test, classifier)
 accuracy = accuracy_print_conf(y_test, y_pred)
 
 #Indicator calculating
-from sklearn.metrics import roc_auc_score, classification_report
 dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
 print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
 print(classification_report(np.int32(y_test), y_pred))
 
 '''
 Day 0:
-Best score (CV): 0.8368421052631578
-Best parameters: {'learning_rate': 0.08, 'n_estimators': 50}
+Best score: 0.8576491228070175
+Best parameters: {'learning_rate': 0.08, 'n_estimators': 10}
 The confusion matrix is:
- [[14  1]
- [ 5  3]]
-The accuracy is: 0.7391304347826086
-Decision Tree AUC = 0.65
+ [[12  2]
+ [ 0  9]]
+The accuracy is: 0.91
+Decision Tree AUC = 0.93
+              precision    recall  f1-score   support
 
-Day 1:
-Best score (CV): 0.8368421052631578
-Best parameters: {'learning_rate': 0.08, 'n_estimators': 100}
-The confusion matrix is:
- [[15  0]
- [ 5  3]]
-The accuracy is: 0.782608695652174
-Decision Tree AUC = 0.69
+           0       1.00      0.86      0.92        14
+           1       0.82      1.00      0.90         9
 
-Day 2:
-Best score (CV): 0.8157894736842106
-Best parameters: {'learning_rate': 0.08, 'n_estimators': 50}
-The confusion matrix is:
- [[14  1]
- [ 5  3]]
-The accuracy is: 0.7391304347826086
-Decision Tree AUC = 0.65
+    accuracy                           0.91        23
+   macro avg       0.91      0.93      0.91        23
+weighted avg       0.93      0.91      0.91        23
 '''
 
 # =============================================================================
@@ -317,15 +385,14 @@ Decision Tree AUC = 0.65
 # =============================================================================
 try:
     from joblib import load
-    classifier = load('DecisionTreeForLSTM_FRO_KC1_avg_15_day_0.joblib')
+    classifier = load('DecisionTreeForLSTM_new'+station+'.joblib')
     print('Trained decision tree result loaded successfully')
 except:
     print('No training result detected, training...')
-    #from sklearn.tree import DecisionTreeClassifier
+    from sklearn.tree import DecisionTreeClassifier
     classifier = DecisionTreeClassifier()# Use 'entropy' instead of 'gini'
     
     # Grid searching
-    #from sklearn.model_selection import GridSearchCV
     parameters = {'criterion':('gini', 'entropy'),
                   'min_weight_fraction_leaf':(0.1, 0.01)}
     clf = GridSearchCV(classifier, parameters,n_jobs=-1, cv=5)
@@ -340,7 +407,7 @@ except:
     classifier.fit(X, y.astype('int'))
     
     from joblib import dump
-    dump(classifier, 'DecisionTreeForLSTM_FRO_KC1_avg_15_day_0.joblib')#To be changed
+    dump(classifier, 'DecisionTreeForLSTM_new'+station+'.joblib')#To be changed
     print('Decision tree training result saved')
 
 # Prediction
@@ -348,19 +415,27 @@ print('For DecisionTreeClassifier: ')
 y_pred = predict_test(X_test, classifier)
 accuracy = accuracy_print_conf(y_test, y_pred)
 
-'''
-Day 0:
-Best score (CV): 0.8526315789473685
-Best parameters: {'criterion': 'gini', 'min_weight_fraction_leaf': 0.1}
-The confusion matrix is:
- [[15  0]
- [ 5  3]]
-The accuracy is (test set): 0.782608695652174
-'''
-
 #Indicator calculating
-#from sklearn.metrics import roc_auc_score, classification_report
-dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
-print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
-print(classification_report(np.int32(y_test), y_pred))
-#springFS_pred_test = y_pred.copy()
+try:
+    from sklearn.metrics import roc_auc_score, classification_report
+    dt_roc_auc = roc_auc_score(np.int32(y_test), y_pred)
+    print ("Decision Tree AUC = %2.2f" % dt_roc_auc)
+    print(classification_report(np.int32(y_test), y_pred))
+except:
+    print("ROC doesn't exist")
+
+'''
+The confusion matrix is:
+ [[14  0]
+ [ 2  7]]
+The accuracy is: 0.91
+Decision Tree AUC = 0.89
+              precision    recall  f1-score   support
+
+           0       0.88      1.00      0.93        14
+           1       1.00      0.78      0.88         9
+
+    accuracy                           0.91        23
+   macro avg       0.94      0.89      0.90        23
+weighted avg       0.92      0.91      0.91        23
+'''

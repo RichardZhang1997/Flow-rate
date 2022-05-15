@@ -295,13 +295,13 @@ ax.errorbar(x=months,y=flow_mean,yerr=y_err,alpha=1,color='black',label='Flowrat
 #plt.plot(months, flow_mean,'-', color='black', lw=1.0, label="Average Flow Rate")#Line
 #plt.plot(months, flow_min,'-.', color='blue', lw=1.0, label="Min Flow Rate")#Line
 #plt.plot([0,11],[threshold,threshold],'--',label='Threshold = '+str(threshold),c='black',lw=1.0)
-plt.plot([0,11],[threshold,threshold],'--',label='Threshold = 1.2',c='black',lw=1.0)
-ax.set_ylabel('Monthly average flow rate ($\mathregular{m^{3}}$/s)',fontdict=font2)
+plt.plot([0,11],[threshold,threshold],'--',label='Threshold = 0.7',c='black',lw=1.0)
+ax.set_ylabel('Monthly flow rate ($\mathregular{m^{3}}$/s)',fontdict=font2)
 ax.set_xlabel('Month',fontdict=font2)
 ax.set_xlim(-1,12)
-ax.set_ylim(-0.2,12)
+ax.set_ylim(-0.2,5)
 ax.set_xticks(np.arange(0, 13, step=1))
-ax.text(0.82, 0.92, 'Station 1', transform = ax.transAxes, fontdict=font2, zorder=4)
+ax.text(0.82, 0.92, 'Station 3', transform = ax.transAxes, fontdict=font2, zorder=4)
 plt.legend(loc='upper left',frameon=False,prop=font1)
 plt.show()
 
@@ -349,3 +349,43 @@ plt.xlabel('Time',fontdict=font2)
 plt.text(0.86, 0.94, 'Station 3', fontdict=font2, transform = ax.transAxes)
 plt.show()
 
+# =============================================================================
+# Monthly averaged precipitation and temperature plot
+# =============================================================================
+weather = pd.read_csv('en_climate_daily_BC_1157630_1990-2013_P1D.csv', 
+                      usecols=[4, 5, 6, 7, 13, 19, 21, 23, 25]) 
+
+weather['Datetime'] = pd.to_datetime(weather['Date/Time'], format='%Y/%m/%d')
+weather = weather.drop('Date/Time', 1)
+
+mean_temp = weather.groupby('Month')['Mean Temp (°C)'].mean()
+std_temp = weather.groupby('Month')['Mean Temp (°C)'].std()
+mean_precip = weather.groupby('Month')['Total Precip (mm)'].mean()
+std_precip = weather.groupby('Month')['Total Precip (mm)'].std()
+months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+month_days = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+# monthly averaged precipitation and temperature plot
+plt.rcParams['figure.figsize'] = (12.0,4.0)
+plt.rcParams['figure.dpi'] = 300
+plt.rcParams['xtick.labelsize'] = 16
+plt.rcParams['ytick.labelsize'] = 16
+plt.rcParams['font.sans-serif']=['Times New Roman']
+plt.rcParams['lines.markersize']=8
+fig = plt.figure()
+#画柱形图
+ax1 = fig.add_subplot(111)
+ax1.bar(months, mean_precip*month_days,alpha=.7,color='grey', label='Precipitation',width=0.6)
+#ax1.errorbar(x=months,y=mean_precip,yerr=std_precip,alpha=.7,color='g',label='Precipitation',fmt='o:',mfc='wheat',mec='salmon',capsize=5)
+ax1.set_ylim(0,100)
+ax1.set_ylabel('Monthly average total precipitation (mm)',fontdict=font2)
+plt.legend(loc='upper left',frameon=False,prop=font2)
+#ax1.set_title("数据统计",fontsize='20')
+#画折线图 
+ax2 = ax1.twinx()   #组合图必须加这个
+ax2.plot(months, mean_temp, color='black', linewidth=1, linestyle='-', marker='s', label='Temperature')
+#ax2.scatter(months, mean_temp, linewidth=2, color='red', label='Temperature')
+ax2.set_ylabel('Monthly average temperature (℃)',fontdict=font2)
+ax2.set_ylim(-10,20)
+plt.legend(loc='upper right',frameon=False,prop=font2)
+plt.show()
