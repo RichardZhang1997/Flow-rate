@@ -1,0 +1,4 @@
+In my paper:
+Station 1: FRO_KC1
+Station 2: FRO_HC1
+Station 3: EVO_HC1
